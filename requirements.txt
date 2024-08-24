@@ -1,33 +1,30 @@
 # For image manipulation and processing
-Pillow==10.0.0
+Pillow
 
 # For screenshot capture
-mss==7.0.1
+mss
 
 # For interacting with windows
-pygetwindow==0.0.9
+pygetwindow
 
 # For image matching on screen
-pyscreeze==0.1.28
+pyscreeze
 
 # For automating GUI interactions
-pyautogui==0.9.53
-pyHM==0.1.0
+pyautogui
+pyHM
 
 # For working with object detection models
-transformers==4.32.0
+transformers
 
 # For asynchronous programming
-asyncio==3.4.3
+asyncio
 
 # For logging
-logging==0.5.1.2
+logging
 
 # For working with URLs
-requests==2.31.0
-
-# For GUI overlays
-tkinter==0.1.0
+requests
 
 # Optional dependencies for the custom_logger if color support is needed
-colorama==0.4.6
+colorama

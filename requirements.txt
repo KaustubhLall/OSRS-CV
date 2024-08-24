@@ -7,15 +7,11 @@ mss
 # For interacting with windows
 pygetwindow
 
-# For image matching on screen
-pyscreeze
-
 # For automating GUI interactions
 pyautogui
 pyHM
 
 # For working with object detection models
-transformers
 python-opencv
 
 # For working with URLs
@@ -23,3 +19,12 @@ requests
 
 # Optional dependencies for the custom_logger if color support is needed
 colorama
+
+# for logging and debugging
+icecream
+
+# deep learning dependencies
+transformers
+fastapi
+uvicorn
+python-multipart

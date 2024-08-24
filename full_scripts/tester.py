@@ -26,7 +26,7 @@ drawer = OverlayDrawer()
 
 # Debugging: Show loaded assets
 ic(assets)
-conf = 0.3
+conf = 0.95
 
 
 def concatenate_images(target_image, screen):
@@ -104,10 +104,10 @@ async def test_object_detection(item_name, screen_name, screen_path):
 
 async def main():
     item_names = [
-        'rune-jav-head',
+        # 'rune-jav-head',
         'run-on',
-        'spec-off',
-        'prayer-off',
+        # 'spec-off',
+        # 'prayer-off',
     ]
     tasks = []
 

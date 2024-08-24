@@ -46,8 +46,8 @@ Before you begin, ensure you have met the following requirements:
 1. **Clone the Repository**:
 
    ```bash
-   git clone https://github.com/yourusername/osrs-ai-automation.git
-   cd osrs-ai-automation
+   git clone https://github.com/KaustubhLall/OSRS-CV.git
+   cd OSRS-CV
    ```
 
 2. **Install the Required Python Packages**:

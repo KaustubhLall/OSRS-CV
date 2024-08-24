@@ -1,11 +1,12 @@
+import base64
+import io
 import time
-import logging
-from fastapi import FastAPI, UploadFile, File, Query
-from fastapi.responses import JSONResponse
+
+import torch
 import uvicorn
 from PIL import Image
-import io
-import torch
+from fastapi import FastAPI, UploadFile, File, Query
+from fastapi.responses import JSONResponse
 from transformers import YolosImageProcessor, YolosForObjectDetection
 
 from utils.custom_logger import setup_logging
@@ -70,11 +71,25 @@ async def predict(file: UploadFile = File(...), threshold: float = Query(0.5)):
         step_time = (time.time() - start_time) * 1000
         logger.info(f"Step 4 (Post-Processing): {step_time:.2f} ms")
 
+        # Convert the model's processed image tensor back to a PIL Image
+        processed_image_tensor = inputs["pixel_values"].squeeze(0).permute(1, 2, 0).cpu().numpy()
+        processed_image = Image.fromarray((processed_image_tensor * 255).astype('uint8'))
+
+        # Ensure that the processed image matches the model's output resolution
+        expected_width, expected_height = processed_image_tensor.shape[1], processed_image_tensor.shape[0]
+        processed_image = processed_image.resize((expected_width, expected_height))
+
+        # Encode the image to base64 to send as part of the JSON response
+        buffered = io.BytesIO()
+        processed_image.save(buffered, format="JPEG")
+        encoded_image = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
         # Calculate total latency
         total_latency = (time.time() - overall_start_time) * 1000
         logger.info(f"Total Processing time: {total_latency:.2f} ms")
 
-        return JSONResponse(content={"results": results, "latency": total_latency / 1000})
+        return JSONResponse(
+            content={"results": results, "latency": total_latency / 1000, "processed_image": encoded_image})
 
     except Exception as e:
         logger.error(f"Error processing the image: {e}")

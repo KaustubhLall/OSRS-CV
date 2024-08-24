@@ -16,12 +16,7 @@ pyHM
 
 # For working with object detection models
 transformers
-
-# For asynchronous programming
-asyncio
-
-# For logging
-logging
+python-opencv
 
 # For working with URLs
 requests

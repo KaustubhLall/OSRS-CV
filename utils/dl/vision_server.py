@@ -14,9 +14,19 @@ app = FastAPI()
 
 logger = setup_logging(log_to_file=False)
 
+# Measure initial startup time
+initial_start_time = time.time()
+
+# Check device availability
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+logger.info(f"Using device: {'GPU' if device.type == 'cuda' else 'CPU'}")
+
 # Load the YOLOS model and image processor
 image_processor = YolosImageProcessor.from_pretrained('hustvl/yolos-small')
-model = YolosForObjectDetection.from_pretrained('hustvl/yolos-small')
+model = YolosForObjectDetection.from_pretrained('hustvl/yolos-small').to(device)
+
+initial_latency = (time.time() - initial_start_time) * 1000
+logger.info(f"Model and Image Processor loaded in: {initial_latency:.2f} ms")
 
 
 @app.post("/predict/")
@@ -34,7 +44,7 @@ async def predict(file: UploadFile = File(...), threshold: float = Query(0.5)):
 
         # Step 2: Preprocess the image
         start_time = time.time()
-        inputs = image_processor(images=image, return_tensors="pt")
+        inputs = image_processor(images=image, return_tensors="pt").to(device)
         step_time = (time.time() - start_time) * 1000
         logger.info(f"Step 2 (Image Preprocessing): {step_time:.2f} ms")
 

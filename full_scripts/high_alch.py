@@ -6,11 +6,11 @@ import pyautogui
 from PIL import ImageDraw
 from pyHM import mouse
 
-from assets import load_assets
+from utils.assets_path_loader import load_assets
 from utils.custom_logger import setup_logging
+from utils.image_loader import ImageLoader
 from utils.overlay import OverlayDrawer
 from utils.screen_capture import ScreenCapture
-from utils.sprite_loader import ImageLoader
 from utils.vision_tools import locate_on_screen
 
 # Set up logging

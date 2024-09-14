@@ -1,7 +1,6 @@
 from pathlib import Path
-import os
 
-ASSETS_ROOT = Path(__file__).parent / "assets"
+ASSETS_ROOT = Path(__file__).parent / "../assets"
 
 
 def load_assets(path=ASSETS_ROOT):

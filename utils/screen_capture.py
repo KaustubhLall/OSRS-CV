@@ -16,6 +16,9 @@ class ScreenCapture:
         self.app_name = app_name
         self.window = None
         self.sct = mss.mss()
+        self.total_capture_time = 0.0
+        self.total_decode_time = 0.0
+        self.total_frames = 0
         logger.debug("Initialized ScreenCapture with app_name: %s", app_name)
         if app_name:
             self.set_application(app_name)
@@ -90,18 +93,24 @@ class ScreenCapture:
                 "height": bbox["height"]
             }
 
-            start_time = time.time()
+            start_capture = time.perf_counter()
             screenshot = self.sct.grab(monitor)
-            capture_time = (time.time() - start_time) * 1000  # Convert to ms
+            capture_time = (time.perf_counter() - start_capture) * 1000  # ms
             logger.info("Screen captured in %.2f ms.", capture_time)
+            self.total_capture_time += capture_time
+            self.total_frames += 1
 
-            start_time = time.time()
+            start_decode = time.perf_counter()
             img = Image.frombytes('RGB', (screenshot.width, screenshot.height), screenshot.rgb)
-            decode_time = (time.time() - start_time) * 1000  # Convert to ms
+            decode_time = (time.perf_counter() - start_decode) * 1000  # ms
             logger.info("Image decoded in %.2f ms.", decode_time)
+            self.total_decode_time += decode_time
 
+            start_save = time.perf_counter()
             img.save(output_path)
-            logger.info("Screenshot saved to '%s'", output_path)
+            save_time = (time.perf_counter() - start_save) * 1000  # ms
+            logger.info("Screenshot saved to '%s' in %.2f ms.", output_path, save_time)
+
         except Exception as e:
             logger.exception("Failed to capture and save screenshot: %s", e)
             raise
@@ -120,55 +129,156 @@ class ScreenCapture:
                 "height": bbox["height"]
             }
 
-            start_time = time.time()
+            start_capture = time.perf_counter()
             screenshot = self.sct.grab(monitor)
-            capture_time = (time.time() - start_time) * 1000  # Convert to ms
+            capture_time = (time.perf_counter() - start_capture) * 1000  # ms
             logger.info("Screen captured in %.2f ms.", capture_time)
+            self.total_capture_time += capture_time
+            self.total_frames += 1
 
-            start_time = time.time()
+            start_decode = time.perf_counter()
             img = Image.frombytes('RGB', (screenshot.width, screenshot.height), screenshot.rgb)
-            decode_time = (time.time() - start_time) * 1000  # Convert to ms
+            decode_time = (time.perf_counter() - start_decode) * 1000  # ms
             logger.info("Image decoded in %.2f ms.", decode_time)
+            self.total_decode_time += decode_time
 
+            start_save = time.perf_counter()
             img_bytes = BytesIO()
             img.save(img_bytes, format='PNG')
             img_bytes.seek(0)
             img_size = img_bytes.getbuffer().nbytes
-            logger.debug("Screenshot captured to memory: %d bytes", img_size)
+            save_time = (time.perf_counter() - start_save) * 1000  # ms
+            logger.debug("Screenshot captured to memory: %d bytes in %.2f ms", img_size, save_time)
 
             return img_bytes
+
         except Exception as e:
             logger.exception("Failed to capture screenshot to memory: %s", e)
             raise
 
+    def get_total_times(self):
+        """
+        Returns the total capture and decode times along with the number of frames processed.
+
+        :return: Dictionary containing total capture time, total decode time, and total frames.
+        """
+        return {
+            "total_capture_time_ms": self.total_capture_time,
+            "total_decode_time_ms": self.total_decode_time,
+            "total_frames": self.total_frames
+        }
+
+
+def measure_fps(screen_capture: ScreenCapture, num_frames=100, display_image=False):
+    """
+    Measures the FPS by capturing a specified number of frames and calculating the average time per frame.
+
+    :param screen_capture: An instance of ScreenCapture.
+    :param num_frames: Number of frames to capture for measurement.
+    :param display_image: Whether to display the last captured image.
+    :return: Dictionary containing average capture time, average decode time, and estimated FPS.
+    """
+    try:
+        logger.info("Starting FPS measurement for %d frames.", num_frames)
+        capture_times = []
+        decode_times = []
+        last_image = None
+
+        # Retrieve window coordinates and monitor settings once
+        bbox = screen_capture.get_window_coordinates()
+        monitor = {
+            "top": bbox["top"],
+            "left": bbox["left"],
+            "width": bbox["width"],
+            "height": bbox["height"]
+        }
+
+        for i in range(num_frames):
+            # Capture time
+            start_capture = time.perf_counter()
+            screenshot = screen_capture.sct.grab(monitor)
+            end_capture = time.perf_counter()
+            capture_time = (end_capture - start_capture) * 1000  # ms
+            capture_times.append(capture_time)
+
+            # Decode time
+            start_decode = time.perf_counter()
+            img = Image.frombytes('RGB', (screenshot.width, screenshot.height), screenshot.rgb)
+            end_decode = time.perf_counter()
+            decode_time = (end_decode - start_decode) * 1000  # ms
+            decode_times.append(decode_time)
+
+            last_image = img  # Keep reference for optional display
+
+        avg_capture_time = sum(capture_times) / num_frames
+        avg_decode_time = sum(decode_times) / num_frames
+        total_time_ms = avg_capture_time + avg_decode_time
+        fps = 1000 / total_time_ms if total_time_ms > 0 else float('inf')
+
+        logger.info("FPS Measurement Completed:")
+        logger.info("Average capture time per frame: %.2f ms", avg_capture_time)
+        logger.info("Average decode time per frame: %.2f ms", avg_decode_time)
+        logger.info("Estimated FPS: %.2f", fps)
+
+        if display_image and last_image:
+            last_image.show()
+            logger.debug("Image display triggered for FPS measurement.")
+
+        return {
+            "average_capture_time_ms": avg_capture_time,
+            "average_decode_time_ms": avg_decode_time,
+            "estimated_fps": fps
+        }
+
+    except Exception as e:
+        logger.exception("An error occurred during FPS measurement: %s", e)
+        raise
+
 
 if __name__ == "__main__":
     try:
-        total_start_time = time.time()
+        total_start_time = time.perf_counter()
 
         screen_capture = ScreenCapture()
         # Uncomment the following line to set application by name
         screen_capture.set_application(app_name="RuneLite")
         # screen_capture.set_application(interactive=True)
+
+        # Capture to disk
         screen_capture.capture_to_disk("selected_window_screenshot.png")
 
+        # Capture to memory
         img_bytes = screen_capture.capture_to_memory()
-        start_time = time.time()
+        start_load = time.perf_counter()
         img = Image.open(img_bytes)
-        decode_time = (time.time() - start_time) * 1000
+        end_load = time.perf_counter()
+        decode_time = (end_load - start_load) * 1000  # ms
         logger.info("Image loaded from memory in %.2f ms.", decode_time)
 
-        start_time = time.time()
+        start_convert = time.perf_counter()
         img = img.convert("RGB")
-        convert_time = (time.time() - start_time) * 1000
+        end_convert = time.perf_counter()
+        convert_time = (end_convert - start_convert) * 1000  # ms
         logger.info("Image converted to RGB in %.2f ms.", convert_time)
 
+        # Optionally display the image (excluded from latency measurement)
         img.show()
         logger.debug("Image display triggered.")
 
-        total_end_time = time.time()
-        total_latency_ms = (total_end_time - total_start_time) * 1000
-        logger.info("Total latency for capture and load operations: %.2f ms.", total_latency_ms)
+        # Calculate total latency excluding FPS measurement
+        capture_end_time = time.perf_counter()
+        capture_latency_ms = (capture_end_time - total_start_time) * 1000
+        logger.info("Total latency for capture and load operations: %.2f ms.", capture_latency_ms)
+
+        # Measure FPS (optional and separate from total latency)
+        perform_fps_measurement = True  # Set to False to skip FPS measurement
+        if perform_fps_measurement:
+            fps_results = measure_fps(screen_capture, num_frames=100, display_image=False)
+            logger.info("FPS Measurement Results: %s", fps_results)
+
+        # Retrieve total times from the class
+        total_times = screen_capture.get_total_times()
+        logger.info("Aggregated Capture Times: %s", total_times)
 
     except Exception as e:
         logger.exception("An error occurred during screen capture operations: %s", e)

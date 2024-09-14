@@ -1,4 +1,6 @@
+import logging
 import time
+from contextlib import contextmanager
 from io import BytesIO
 
 import mss
@@ -7,27 +9,62 @@ from PIL import Image
 
 from utils.custom_logger import setup_logging
 
+# Initialize logging with adjustable verbosity
 logger_manager = setup_logging(log_to_file=True, log_to_stdout=True)
 logger = logger_manager.get_logger(__name__)
 
 
+@contextmanager
+def Timer(name: str):
+    """
+    Context manager for timing code blocks.
+    Logs the elapsed time upon exiting the context.
+    """
+    start_time = time.perf_counter()
+    try:
+        yield
+    finally:
+        end_time = time.perf_counter()
+        elapsed_ms = (end_time - start_time) * 1000
+        logger.debug(f"{name} completed in {elapsed_ms:.2f} ms.")
+
+
 class ScreenCapture:
-    def __init__(self, app_name=None):
+    def __init__(self, app_name: str = None, verbose: bool = False):
+        """
+        Initializes the ScreenCapture instance.
+
+        :param app_name: Name of the application/window to capture.
+        :param verbose: If True, sets logging level to DEBUG.
+        """
         self.app_name = app_name
         self.window = None
         self.sct = mss.mss()
         self.total_capture_time = 0.0
         self.total_decode_time = 0.0
         self.total_frames = 0
+
+        # Adjust logging level based on verbosity
+        if verbose:
+            logger.setLevel(logging.DEBUG)
+        else:
+            logger.setLevel(logging.INFO)
+
         logger.debug("Initialized ScreenCapture with app_name: %s", app_name)
         if app_name:
             self.set_application(app_name)
 
     def __del__(self):
         self.sct.close()
-        logger.debug("Closed mss instance")
+        logger.debug("Closed mss instance.")
 
-    def set_application(self, app_name=None, interactive=False):
+    def set_application(self, app_name: str = None, interactive: bool = False):
+        """
+        Sets the application/window to capture by name or interactively.
+
+        :param app_name: Name of the application/window to capture.
+        :param interactive: If True, allows user to select a window interactively.
+        """
         if interactive:
             app_name = self._choose_window_interactively()
         if app_name:
@@ -35,8 +72,14 @@ class ScreenCapture:
             self.window = self._find_window()
             logger.info("Application set to: '%s'", app_name)
 
-    def _choose_window_interactively(self):
+    def _choose_window_interactively(self) -> str:
+        """
+        Allows the user to select a window interactively.
+
+        :return: The title of the selected window.
+        """
         windows = gw.getAllTitles()
+        windows = [w for w in windows if w.strip()]  # Filter out empty titles
         if not windows:
             logger.error("No available windows found for selection.")
             raise ValueError("No available windows found.")
@@ -53,11 +96,16 @@ class ScreenCapture:
             else:
                 logger.error("Selected index %d is out of range.", selected_index)
                 raise ValueError("Invalid selection.")
-        except ValueError as e:
-            logger.exception("Invalid input during window selection")
+        except ValueError:
+            logger.exception("Invalid input during window selection.")
             raise
 
     def _find_window(self):
+        """
+        Finds the window object based on the application name.
+
+        :return: The window object.
+        """
         windows = gw.getWindowsWithTitle(self.app_name)
         if windows:
             found_window = windows[0]
@@ -67,7 +115,12 @@ class ScreenCapture:
             logger.error("No window found with title containing '%s'", self.app_name)
             raise ValueError(f"No window found with title containing '{self.app_name}'")
 
-    def get_window_coordinates(self):
+    def get_window_coordinates(self) -> dict:
+        """
+        Retrieves the coordinates of the selected window.
+
+        :return: Dictionary containing window coordinates.
+        """
         if not self.window:
             logger.error("Attempted to get coordinates without setting a window.")
             raise ValueError("No window set. Please set the application first.")
@@ -75,15 +128,18 @@ class ScreenCapture:
         coordinates = {
             "left": self.window.left,
             "top": self.window.top,
-            "right": self.window.right,
-            "bottom": self.window.bottom,
             "width": self.window.width,
             "height": self.window.height
         }
         logger.debug("Retrieved window coordinates: %s", coordinates)
         return coordinates
 
-    def capture_to_disk(self, output_path="screenshot.png"):
+    def capture_to_disk(self, output_path: str = "screenshot.png"):
+        """
+        Captures the screenshot of the window and saves it to disk.
+
+        :param output_path: Path to save the screenshot.
+        """
         try:
             bbox = self.get_window_coordinates()
             monitor = {
@@ -93,29 +149,38 @@ class ScreenCapture:
                 "height": bbox["height"]
             }
 
-            start_capture = time.perf_counter()
-            screenshot = self.sct.grab(monitor)
-            capture_time = (time.perf_counter() - start_capture) * 1000  # ms
-            logger.info("Screen captured in %.2f ms.", capture_time)
+            with Timer("Screen capture"):
+                screenshot = self.sct.grab(monitor)
+                capture_start = time.perf_counter()
+
+            with Timer("Image decoding"):
+                img = Image.frombytes('RGB', (screenshot.width, screenshot.height), screenshot.rgb)
+                decode_start = time.perf_counter()
+
+            with Timer("Saving image to disk"):
+                img.save(output_path)
+                logger.info("Screenshot saved to '%s'.", output_path)
+                save_end = time.perf_counter()
+
+            # Calculate elapsed times
+            capture_time = (decode_start - capture_start) * 1000  # ms
+            decode_time = (save_end - decode_start) * 1000  # ms
+
+            # Update total times
             self.total_capture_time += capture_time
-            self.total_frames += 1
-
-            start_decode = time.perf_counter()
-            img = Image.frombytes('RGB', (screenshot.width, screenshot.height), screenshot.rgb)
-            decode_time = (time.perf_counter() - start_decode) * 1000  # ms
-            logger.info("Image decoded in %.2f ms.", decode_time)
             self.total_decode_time += decode_time
-
-            start_save = time.perf_counter()
-            img.save(output_path)
-            save_time = (time.perf_counter() - start_save) * 1000  # ms
-            logger.info("Screenshot saved to '%s' in %.2f ms.", output_path, save_time)
+            self.total_frames += 1
 
         except Exception as e:
             logger.exception("Failed to capture and save screenshot: %s", e)
             raise
 
-    def capture_to_memory(self):
+    def capture_to_memory(self) -> BytesIO:
+        """
+        Captures the screenshot of the window and saves it to memory.
+
+        :return: BytesIO object containing the screenshot image.
+        """
         if not self.window:
             logger.error("Attempted to capture to memory without setting a window.")
             raise ValueError("No window set. Please set the application first.")
@@ -129,26 +194,30 @@ class ScreenCapture:
                 "height": bbox["height"]
             }
 
-            start_capture = time.perf_counter()
-            screenshot = self.sct.grab(monitor)
-            capture_time = (time.perf_counter() - start_capture) * 1000  # ms
-            logger.info("Screen captured in %.2f ms.", capture_time)
+            with Timer("Screen capture"):
+                screenshot = self.sct.grab(monitor)
+                capture_start = time.perf_counter()
+
+            with Timer("Image decoding"):
+                img = Image.frombytes('RGB', (screenshot.width, screenshot.height), screenshot.rgb)
+                decode_start = time.perf_counter()
+
+            with Timer("Saving image to memory"):
+                img_bytes = BytesIO()
+                img.save(img_bytes, format='PNG')
+                img_bytes.seek(0)
+                img_size = img_bytes.getbuffer().nbytes
+                logger.debug("Screenshot captured to memory: %d bytes.", img_size)
+                save_end = time.perf_counter()
+
+            # Calculate elapsed times
+            capture_time = (decode_start - capture_start) * 1000  # ms
+            decode_time = (save_end - decode_start) * 1000  # ms
+
+            # Update total times
             self.total_capture_time += capture_time
-            self.total_frames += 1
-
-            start_decode = time.perf_counter()
-            img = Image.frombytes('RGB', (screenshot.width, screenshot.height), screenshot.rgb)
-            decode_time = (time.perf_counter() - start_decode) * 1000  # ms
-            logger.info("Image decoded in %.2f ms.", decode_time)
             self.total_decode_time += decode_time
-
-            start_save = time.perf_counter()
-            img_bytes = BytesIO()
-            img.save(img_bytes, format='PNG')
-            img_bytes.seek(0)
-            img_size = img_bytes.getbuffer().nbytes
-            save_time = (time.perf_counter() - start_save) * 1000  # ms
-            logger.debug("Screenshot captured to memory: %d bytes in %.2f ms", img_size, save_time)
+            self.total_frames += 1
 
             return img_bytes
 
@@ -156,7 +225,7 @@ class ScreenCapture:
             logger.exception("Failed to capture screenshot to memory: %s", e)
             raise
 
-    def get_total_times(self):
+    def get_total_times(self) -> dict:
         """
         Returns the total capture and decode times along with the number of frames processed.
 
@@ -169,7 +238,7 @@ class ScreenCapture:
         }
 
 
-def measure_fps(screen_capture: ScreenCapture, num_frames=100, display_image=False):
+def measure_fps(screen_capture: ScreenCapture, num_frames: int = 100, display_image: bool = False) -> dict:
     """
     Measures the FPS by capturing a specified number of frames and calculating the average time per frame.
 
@@ -184,7 +253,6 @@ def measure_fps(screen_capture: ScreenCapture, num_frames=100, display_image=Fal
         decode_times = []
         last_image = None
 
-        # Retrieve window coordinates and monitor settings once
         bbox = screen_capture.get_window_coordinates()
         monitor = {
             "top": bbox["top"],
@@ -239,9 +307,11 @@ if __name__ == "__main__":
     try:
         total_start_time = time.perf_counter()
 
-        screen_capture = ScreenCapture()
+        # Initialize ScreenCapture with desired verbosity
+        screen_capture = ScreenCapture(verbose=False)
         # Uncomment the following line to set application by name
         screen_capture.set_application(app_name="RuneLite")
+        # Alternatively, enable interactive window selection
         # screen_capture.set_application(interactive=True)
 
         # Capture to disk
@@ -249,17 +319,11 @@ if __name__ == "__main__":
 
         # Capture to memory
         img_bytes = screen_capture.capture_to_memory()
-        start_load = time.perf_counter()
-        img = Image.open(img_bytes)
-        end_load = time.perf_counter()
-        decode_time = (end_load - start_load) * 1000  # ms
-        logger.info("Image loaded from memory in %.2f ms.", decode_time)
+        with Timer("Loading image from memory"):
+            img = Image.open(img_bytes)
 
-        start_convert = time.perf_counter()
-        img = img.convert("RGB")
-        end_convert = time.perf_counter()
-        convert_time = (end_convert - start_convert) * 1000  # ms
-        logger.info("Image converted to RGB in %.2f ms.", convert_time)
+        with Timer("Converting image to RGB"):
+            img = img.convert("RGB")
 
         # Optionally display the image (excluded from latency measurement)
         img.show()

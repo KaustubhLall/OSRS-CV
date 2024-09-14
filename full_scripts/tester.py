@@ -5,10 +5,10 @@ import os
 from PIL import ImageDraw, Image
 from icecream import ic
 
-from assets import load_assets
 from full_scripts.high_alch import make_action
+from utils.assets_path_loader import load_assets
+from utils.image_loader import ImageLoader
 from utils.overlay import OverlayDrawer
-from utils.sprite_loader import ImageLoader
 from utils.vision_tools import locate_on_screen
 
 # Set up logging

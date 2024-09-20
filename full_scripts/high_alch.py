@@ -24,9 +24,9 @@ overlay = OverlayDrawer(title="Alching Statistics")  # Initialize the overlay be
 
 # Constants for calculations
 ALCH_EXP = 65  # Experience per alch
-RUNE_COST = 108
-ITEM_COST = 538
-OUTPUT_VALUE = 810  # Coin value per alch
+RUNE_COST = 112
+ITEM_COST = 508
+OUTPUT_VALUE = 768  # Coin value per alch
 INPUT_COST = RUNE_COST + ITEM_COST
 
 
@@ -79,9 +79,9 @@ async def retry_until_found(target_image, screen_capture, loader, max_retries=10
         location = await make_action(target_image, screen, confidence=confidence, debug=debug, iteration=iteration)
         if location:
             return location
-        retries += 1
         logger.debug(f"Retrying... ({retries}/{max_retries})")
         await asyncio.sleep(random.uniform(0.25, 1.0))
+        retries += 1
 
     logger.warning("Failed to find the target image after maximum retries.")
     raise ValueError("Failed to locate image on screen after maximum retries.")
@@ -90,10 +90,17 @@ async def retry_until_found(target_image, screen_capture, loader, max_retries=10
 async def reset_procedure():
     """Perform a reset by pressing 'esc' three times and then pressing '3'."""
     logger.info("Performing reset procedure.")
+    pyautogui.click()
+    pyautogui.click()
+    pyautogui.click()
+
     for _ in range(3):
         pyautogui.press('esc')
         await asyncio.sleep(0.2)
-    pyautogui.press('3')
+    pyautogui.press('1')
+    await asyncio.sleep(0.2)
+
+
     logger.info("Reset complete, resuming script.")
 
 
@@ -114,13 +121,16 @@ async def alch_item(item, screen_capture, loader, confidence, debug, iteration):
     """Attempt to alch the item by locating it on the screen."""
     item_location = await retry_until_found(item, screen_capture, loader, max_retries=10, confidence=confidence,
                                             debug=debug, iteration=iteration)
-    if item_location:
-        mouse.click(*item_location)
-        logger.info(f"Item alched at {item_location}")
-        return True
-    logger.warning("Item not found on screen.")
-    return False
-
+    try:
+        if item_location:
+            mouse.click(*item_location)
+            logger.info(f"Item alched at {item_location}")
+            return True
+        logger.warning("Item not found on screen.")
+        return False
+    except Exception as e:
+        logger.error(f"Error during alch_item: {e}")
+        return False
 
 def format_number(number):
     """Formats the number with 'k' for thousands and 'm' for millions."""
@@ -218,15 +228,15 @@ async def perform_high_alchemy(spell_name, item_name, num_iterations, max_iterat
             logger.error(f"Error encountered during iteration {iterations}: {str(e)}")
             await reset_procedure()
 
-        await asyncio.sleep(random.uniform(0.05, 0.25))
+        await asyncio.sleep(random.uniform(0.05, 0.15))
 
     logger.info(
         f"Script stopped after {iterations} iterations due to reaching the specified number of iterations or timeout.")
 
 
 async def main():
-    await perform_high_alchemy('high-alch', 'rune-jav-head', num_iterations=5000, max_iterations=5000,
-                               max_time_minutes=11 * 30, spell_confidence=0.53, item_confidence=0.35)
+    await perform_high_alchemy('high-alch', 'img', num_iterations=10227, max_iterations=18000,
+                               max_time_minutes=11 * 30, spell_confidence=0.53, item_confidence=0.65)
 
 
 if __name__ == "__main__":

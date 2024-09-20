@@ -6,10 +6,12 @@ import time
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import scrolledtext
+import functools
 
 import keyboard
+import mouse
 from colorama import init, Fore
-from pyHM import mouse
+from pyHM import mouse as hm_mouse
 
 # Initialize colorama
 init(autoreset=True)
@@ -28,7 +30,7 @@ start_event = threading.Event()
 pause_event = threading.Event()
 kill_event = threading.Event()
 
-pyHM_mult = 0.5
+pyHM_mult = 0.5  # Multiplier for mouse movement speed
 
 
 class KillScriptException(Exception):
@@ -87,25 +89,25 @@ def BankingProcedure(run_number, positions, interaction_wait, logger):
     wait_time = INTERACTION_WAIT(*interaction_wait)
     check_events()
     print(Fore.YELLOW + "Moving to bank position.")
-    mouse.move(*positions['bank_pos'], multiplier=pyHM_mult)
+    hm_mouse.move(*positions['bank_pos'], multiplier=pyHM_mult)
     time.sleep(wait_time)
-    mouse.click()
+    hm_mouse.click()
 
     wait_time = INTERACTION_WAIT(*interaction_wait)
     check_events()
     print(Fore.YELLOW + "Moving to deposit all position.")
-    mouse.move(*positions['deposit_all_pos'], multiplier=pyHM_mult)
+    hm_mouse.move(*positions['deposit_all_pos'], multiplier=pyHM_mult)
     time.sleep(wait_time)
-    mouse.click()
+    hm_mouse.click()
 
     wait_time = INTERACTION_WAIT(*interaction_wait)
     check_events()
     print(Fore.YELLOW + "Moving to bank item position.")
-    mouse.move(*positions['bank_item_pos'], multiplier=pyHM_mult)
+    hm_mouse.move(*positions['bank_item_pos'], multiplier=pyHM_mult)
     time.sleep(wait_time)
     print(Fore.YELLOW + "Performing shift double-click on bank item.")
     keyboard.press('shift')
-    mouse.double_click()
+    hm_mouse.double_click()
     keyboard.release('shift')
 
     time.sleep(wait_time)
@@ -139,14 +141,14 @@ def CookingProcedure(run_number, cooking_repeat, tick_time, positions, interacti
         print(Fore.YELLOW + f"Cooking loop iteration {i}/{cooking_repeat}.")
 
         wait_time = INTERACTION_WAIT(*interaction_wait)
-        mouse.move(*positions['inven_food_pos'], multiplier=pyHM_mult)
+        hm_mouse.move(*positions['inven_food_pos'], multiplier=pyHM_mult)
         time.sleep(wait_time)
-        mouse.click()
+        hm_mouse.click()
 
         wait_time = INTERACTION_WAIT(*interaction_wait)
-        mouse.move(*positions['cook_food_pos'], multiplier=pyHM_mult)
+        hm_mouse.move(*positions['cook_food_pos'], multiplier=pyHM_mult)
         time.sleep(wait_time)
-        mouse.click()
+        hm_mouse.click()
 
         # Sleep for one tick
         time.sleep(tick_time)
@@ -183,6 +185,11 @@ class MacroGUI:
         # Redirect stdout to the text widget
         self.logger = ScriptLogger(self.log_output, self.log_file)
         sys.stdout = self.logger
+
+        # Set up hotkeys
+        keyboard.add_hotkey('alt+x', self.hotkey_start_script)
+        keyboard.add_hotkey('alt+c', self.hotkey_pause_script)
+        keyboard.add_hotkey('f1', self.hotkey_stop_script)
 
     def create_widgets(self):
         # Frame for input parameters
@@ -237,16 +244,55 @@ class MacroGUI:
             x_var = tk.IntVar(value=value[0])
             y_var = tk.IntVar(value=value[1])
             pos_vars[key] = (x_var, y_var)
-            tk.Entry(pos_window, textvariable=x_var, width=10).grid(row=row, column=1)
-            tk.Entry(pos_window, textvariable=y_var, width=10).grid(row=row, column=2)
+            x_entry = tk.Entry(pos_window, textvariable=x_var, width=10)
+            x_entry.grid(row=row, column=1)
+            y_entry = tk.Entry(pos_window, textvariable=y_var, width=10)
+            y_entry.grid(row=row, column=2)
+            # Add Set button
+            set_button = tk.Button(pos_window, text="Set", command=functools.partial(self.set_position, key, x_var, y_var))
+            set_button.grid(row=row, column=3)
             row += 1
+
+        # Add current mouse position label
+        current_pos_label = tk.Label(pos_window, text="Current Mouse Position: (0, 0)")
+        current_pos_label.grid(row=row, column=0, columnspan=4)
+        row += 1
+
+        # Function to update the mouse position
+        def update_mouse_position():
+            x, y = mouse.get_position()
+            current_pos_label.config(text=f"Current Mouse Position: ({x}, {y})")
+            pos_window.after(100, update_mouse_position)
+
+        update_mouse_position()
 
         def save_positions():
             for key, (x_var, y_var) in pos_vars.items():
                 self.positions[key] = (x_var.get(), y_var.get())
             pos_window.destroy()
 
-        tk.Button(pos_window, text="Save", command=save_positions).grid(row=row, column=0, columnspan=3, pady=5)
+        tk.Button(pos_window, text="Save", command=save_positions).grid(row=row, column=0, columnspan=4, pady=5)
+
+    def set_position(self, key, x_var, y_var):
+        messagebox.showinfo("Set Position", "Please click to set the position.")
+        # Disable the GUI to prevent interactions
+        self.root.attributes("-disabled", True)
+
+        def wait_for_click():
+            # Wait for the next left button down event
+            mouse.wait(button='left', target_types=('down',))
+            # Get the current mouse position
+            x, y = mouse.get_position()
+            # Schedule the update to the GUI thread
+            self.root.after(0, self.update_position, x_var, y_var, x, y)
+
+        threading.Thread(target=wait_for_click).start()
+
+    def update_position(self, x_var, y_var, x, y):
+        x_var.set(x)
+        y_var.set(y)
+        # Re-enable the GUI
+        self.root.attributes("-disabled", False)
 
     def start_script(self):
         if not self.running:
@@ -310,6 +356,16 @@ class MacroGUI:
         except KillScriptException:
             print(Fore.RED + "Script terminated.")
             self.stop_script()
+
+    # Hotkey methods
+    def hotkey_start_script(self):
+        self.root.after(0, self.start_script)
+
+    def hotkey_pause_script(self):
+        self.root.after(0, self.pause_script)
+
+    def hotkey_stop_script(self):
+        self.root.after(0, self.stop_script)
 
 
 if __name__ == "__main__":

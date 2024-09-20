@@ -3,9 +3,8 @@ import random
 import threading
 import time
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 from tkinter import scrolledtext
-from tkinter import ttk
 import functools
 import re
 
@@ -40,9 +39,8 @@ class KillScriptException(Exception):
     pass
 
 class MouseController:
-    def __init__(self, method='standard', interface_wait=0.5):
+    def __init__(self, method='standard'):
         self.method = method
-        self.interface_wait = interface_wait  # Wait time after interactions
 
     def move(self, x, y, duration=0):
         if self.method == 'standard':
@@ -69,13 +67,13 @@ class TextHandler(logging.Handler):
         logging.Handler.__init__(self)
         self.text_widget = text_widget
         # Configure text tags for colors
-        self.text_widget.tag_config('RED', foreground='red')
-        self.text_widget.tag_config('GREEN', foreground='green')
-        self.text_widget.tag_config('YELLOW', foreground='yellow')
-        self.text_widget.tag_config('BLUE', foreground='blue')
-        self.text_widget.tag_config('MAGENTA', foreground='magenta')
-        self.text_widget.tag_config('CYAN', foreground='cyan')
-        self.text_widget.tag_config('RESET', foreground='black')
+        self.text_widget.tag_config('RED', foreground='#FF5555')
+        self.text_widget.tag_config('GREEN', foreground='#50FA7B')
+        self.text_widget.tag_config('YELLOW', foreground='#F1FA8C')
+        self.text_widget.tag_config('BLUE', foreground='#BD93F9')
+        self.text_widget.tag_config('MAGENTA', foreground='#FF79C6')
+        self.text_widget.tag_config('CYAN', foreground='#8BE9FD')
+        self.text_widget.tag_config('RESET', foreground='#F8F8F2')
         # Regular expression to match ANSI escape sequences
         self.ANSI_ESCAPE_RE = re.compile(r'\x1b\[(\d+)(;\d+)*m')
         self.COLOR_MAP = {
@@ -119,107 +117,139 @@ def INTERACTION_WAIT(min_wait, max_wait):
 
 def check_events():
     """Checks for kill and pause events."""
-    if kill_event.is_set():
-        raise KillScriptException()
-    while pause_event.is_set():
+    while True:
+        if kill_event.is_set():
+            raise KillScriptException()
+        if not pause_event.is_set():
+            break
         time.sleep(0.1)
 
-def press_key_continuously(key, stop_event, interval=0.05):
-    """Presses a key continuously at specified intervals until stopped."""
-    while not stop_event.is_set():
-        keyboard_controller.press(key)
+def press_key_smoothly(key, stop_event):
+    """Simulates holding down a key smoothly until stopped or paused."""
+    keyboard_controller.press(key)
+    try:
+        while not stop_event.is_set():
+            if kill_event.is_set() or pause_event.is_set():
+                break
+            time.sleep(0.1)
+    finally:
         keyboard_controller.release(key)
-        time.sleep(interval)
 
-def BankingProcedure(run_number, positions, interaction_wait, logger, interface_wait, mouse_controller):
+def BankingProcedure(run_number, positions, interaction_wait, logger, mouse_controller):
     """Performs the banking procedure."""
     logger.info(Fore.CYAN + f"Starting Banking Procedure (Run {run_number})...")
     wait_time = INTERACTION_WAIT(*interaction_wait)
     check_events()
-    logger.info(Fore.YELLOW + "Moving to bank position.")
+    logger.debug(Fore.CYAN + "Moving to bank position.")
     mouse_controller.move(*positions['bank_pos'], duration=wait_time)
     time.sleep(wait_time)
     mouse_controller.click()
-    time.sleep(interface_wait)  # Interface wait
+    time.sleep(wait_time)
 
     wait_time = INTERACTION_WAIT(*interaction_wait)
     check_events()
-    logger.info(Fore.YELLOW + "Moving to deposit all position.")
+    logger.debug(Fore.CYAN + "Moving to deposit all position.")
     mouse_controller.move(*positions['deposit_all_pos'], duration=wait_time)
     time.sleep(wait_time)
     mouse_controller.click()
-    time.sleep(interface_wait)  # Interface wait
+    time.sleep(wait_time)
 
     wait_time = INTERACTION_WAIT(*interaction_wait)
     check_events()
-    logger.info(Fore.YELLOW + "Moving to bank item position.")
+    logger.debug(Fore.CYAN + "Moving to bank item position.")
     mouse_controller.move(*positions['bank_item_pos'], duration=wait_time)
     time.sleep(wait_time)
-    logger.info(Fore.YELLOW + "Performing shift double-click on bank item.")
+    logger.debug(Fore.CYAN + "Performing shift double-click on bank item.")
     keyboard_controller.press(Key.shift)
     mouse_controller.double_click()
     keyboard_controller.release(Key.shift)
-    time.sleep(interface_wait)  # Interface wait
+    time.sleep(wait_time)
 
-    logger.info(Fore.YELLOW + "Pressing ESC to close bank interface.")
+    logger.debug(Fore.CYAN + "Pressing ESC to close bank interface.")
     keyboard_controller.press(Key.esc)
     keyboard_controller.release(Key.esc)
-    keyboard_controller.press(Key.esc)
-    keyboard_controller.release(Key.esc)
-    time.sleep(interface_wait)  # Interface wait
+    time.sleep(wait_time)
 
     logger.info(Fore.CYAN + f"Completed Banking Procedure (Run {run_number}).")
 
-def CookingProcedure(run_number, cooking_repeat, tick_time, positions, interaction_wait, logger, interface_wait, mouse_controller):
+def CookingProcedure(run_number, cooking_repeat, tick_time, speculative_mode, cooking_loop_target, positions, interaction_wait, logger, mouse_controller, app):
     """Performs the cooking procedure."""
     logger.info(Fore.GREEN + f"Starting Cooking Procedure (Run {run_number})...")
     wait_time = INTERACTION_WAIT(*interaction_wait)
     check_events()
-    logger.info(Fore.YELLOW + "Pressing 'q' to open inventory.")
+    logger.debug(Fore.GREEN + "Pressing 'q' to open inventory.")
     keyboard_controller.press('q')
     keyboard_controller.release('q')
     time.sleep(wait_time)
-    logger.info(Fore.YELLOW + "Pressing 'w' to open cooking interface.")
+    logger.debug(Fore.GREEN + "Pressing 'w' to open cooking interface.")
     keyboard_controller.press('w')
     keyboard_controller.release('w')
-    time.sleep(wait_time * 2)  # Wait for the interface to load/ todo change to interface time
+    time.sleep(wait_time)  # Wait for the interface to load
 
-    # Start pressing '1' continuously
+    # Start holding '1' key smoothly
     stop_event = threading.Event()
-    key_thread = threading.Thread(target=press_key_continuously, args=('1', stop_event)) # todo fix this code running even when script is paused
+    key_thread = threading.Thread(target=press_key_smoothly, args=('1', stop_event))
     key_thread.start()
+
+    total_start_time = time.time()  # To record total execution time
+    iteration_times = []
 
     try:
         for i in range(1, cooking_repeat + 1):
             check_events()
-            start_time = time.time()
+            loop_start_time = time.time()
 
-            logger.info(Fore.YELLOW + f"Cooking loop iteration {i}/{cooking_repeat}.")
+            # Update progress
+            app.update_progress(i, cooking_repeat)
 
+            # Step 1: Move to inven_food_pos and click
             wait_time = INTERACTION_WAIT(*interaction_wait)
             mouse_controller.move(*positions['inven_food_pos'], duration=wait_time)
             time.sleep(wait_time)
             mouse_controller.click()
 
+            # Step 2: Move to cook_food_pos and click
             wait_time = INTERACTION_WAIT(*interaction_wait)
             mouse_controller.move(*positions['cook_food_pos'], duration=wait_time)
             time.sleep(wait_time)
             mouse_controller.click()
 
-            # Sleep for one tick/ # todo configurable to dynamically calculate this based on time elapsed since start time
-            time.sleep(tick_time)
+            # Calculate elapsed time
+            elapsed_time = time.time() - loop_start_time
 
-            # Ensure the loop takes between 600-700 ms
-            elapsed_time = time.time() - start_time
-            if elapsed_time < 0.6:
-                time.sleep(0.6 - elapsed_time)
-            elif elapsed_time > 0.7:
-                logger.warning(Fore.RED + "Warning: Cooking loop took longer than 700 ms.")
+            if speculative_mode:
+                # Adjust sleep time to match cooking_loop_target
+                sleep_time = cooking_loop_target - elapsed_time
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+                else:
+                    logger.warning(Fore.RED + f"Warning: Cooking loop took longer than {cooking_loop_target:.4f} seconds.")
+            else:
+                # Sleep for tick_time
+                sleep_time = tick_time - elapsed_time
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+                else:
+                    logger.warning(Fore.RED + f"Warning: Cooking loop took longer than tick_time ({tick_time:.4f} seconds).")
+                    logger.debug(Fore.BLUE + f"Tick time: {tick_time:.4f}s, Difference: {tick_time - elapsed_time:.4f}s")
+
+            # Record iteration time
+            iteration_time = time.time() - loop_start_time
+            iteration_times.append(iteration_time)
+
+            # Update estimated time remaining
+            app.update_estimated_time(iteration_times, cooking_repeat - i)
+
     finally:
         # Stop the key pressing thread
         stop_event.set()
         key_thread.join()
+        total_execution_time = time.time() - total_start_time
         logger.info(Fore.GREEN + f"Completed Cooking Procedure (Run {run_number}).")
+        logger.debug(Fore.BLUE + f"Total execution time: {total_execution_time:.4f} seconds.")
+        # Reset current progress
+        app.update_progress(0, 1)
+        app.update_estimated_time([], 0)
 
 class MacroGUI:
     def __init__(self, root):
@@ -230,12 +260,13 @@ class MacroGUI:
         # Input parameters with default values
         self.num_runs = tk.IntVar(value=10)
         self.cooking_repeat = tk.IntVar(value=28)
-        self.tick_time = tk.DoubleVar(value=0.6)
+        self.tick_time = tk.DoubleVar(value=0.7)  # Default to 0.7 seconds
+        self.speculative_mode = tk.BooleanVar(value=False)
+        self.cooking_loop_target = tk.DoubleVar(value=0.55)
         self.interaction_wait_min = tk.DoubleVar(value=0.02)
         self.interaction_wait_max = tk.DoubleVar(value=0.05)
         self.positions = default_positions.copy()
         self.mouse_method = tk.StringVar(value='standard')
-        self.interface_wait = tk.DoubleVar(value=0.5)
         self.font_size = tk.IntVar(value=10)
         self.dark_mode = tk.BooleanVar(value=False)
 
@@ -278,37 +309,80 @@ class MacroGUI:
         param_frame = tk.Frame(self.root)
         param_frame.pack(pady=10)
 
-        tk.Label(param_frame, text="Number of Runs:").grid(row=0, column=0, sticky='e')
-        tk.Entry(param_frame, textvariable=self.num_runs).grid(row=0, column=1)
+        row = 0
+        tk.Label(param_frame, text="Number of Runs:").grid(row=row, column=0, sticky='e')
+        tk.Entry(param_frame, textvariable=self.num_runs).grid(row=row, column=1)
+        row += 1
 
-        tk.Label(param_frame, text="Cooking Repeat:").grid(row=1, column=0, sticky='e')
-        tk.Entry(param_frame, textvariable=self.cooking_repeat).grid(row=1, column=1)
+        tk.Label(param_frame, text="Cooking Repeat:").grid(row=row, column=0, sticky='e')
+        tk.Entry(param_frame, textvariable=self.cooking_repeat).grid(row=row, column=1)
+        row +=1
 
-        tk.Label(param_frame, text="Tick Time (s):").grid(row=2, column=0, sticky='e')
-        tk.Entry(param_frame, textvariable=self.tick_time).grid(row=2, column=1)
+        tk.Label(param_frame, text="Tick Time (s):").grid(row=row, column=0, sticky='e')
+        tk.Entry(param_frame, textvariable=self.tick_time).grid(row=row, column=1)
+        row +=1
 
-        tk.Label(param_frame, text="Interaction Wait Min (s):").grid(row=3, column=0, sticky='e')
-        tk.Entry(param_frame, textvariable=self.interaction_wait_min).grid(row=3, column=1)
+        self.speculative_mode_check = tk.Checkbutton(param_frame, text="Speculative Mode", variable=self.speculative_mode)
+        self.speculative_mode_check.grid(row=row, column=0, columnspan=2)
+        row +=1
 
-        tk.Label(param_frame, text="Interaction Wait Max (s):").grid(row=4, column=0, sticky='e')
-        tk.Entry(param_frame, textvariable=self.interaction_wait_max).grid(row=4, column=1)
+        tk.Label(param_frame, text="Cooking Loop Target (s):").grid(row=row, column=0, sticky='e')
+        tk.Entry(param_frame, textvariable=self.cooking_loop_target).grid(row=row, column=1)
+        row +=1
 
-        tk.Label(param_frame, text="Mouse Method:").grid(row=5, column=0, sticky='e')
+        tk.Label(param_frame, text="Interaction Wait Min (s):").grid(row=row, column=0, sticky='e')
+        tk.Entry(param_frame, textvariable=self.interaction_wait_min).grid(row=row, column=1)
+        row +=1
+
+        tk.Label(param_frame, text="Interaction Wait Max (s):").grid(row=row, column=0, sticky='e')
+        tk.Entry(param_frame, textvariable=self.interaction_wait_max).grid(row=row, column=1)
+        row +=1
+
+        tk.Label(param_frame, text="Mouse Method:").grid(row=row, column=0, sticky='e')
         mouse_method_option = tk.OptionMenu(param_frame, self.mouse_method, 'standard', 'pyhm')
-        mouse_method_option.grid(row=5, column=1)
+        mouse_method_option.grid(row=row, column=1)
+        row +=1
 
-        tk.Label(param_frame, text="Interface Wait (s):").grid(row=6, column=0, sticky='e')
-        tk.Entry(param_frame, textvariable=self.interface_wait).grid(row=6, column=1)
-
-        tk.Label(param_frame, text="Font Size:").grid(row=7, column=0, sticky='e')
-        tk.Entry(param_frame, textvariable=self.font_size).grid(row=7, column=1)
+        tk.Label(param_frame, text="Font Size:").grid(row=row, column=0, sticky='e')
+        tk.Entry(param_frame, textvariable=self.font_size).grid(row=row, column=1)
+        row +=1
 
         dark_mode_check = tk.Checkbutton(param_frame, text="Dark Mode", variable=self.dark_mode, command=self.toggle_dark_mode)
-        dark_mode_check.grid(row=8, column=0, columnspan=2)
+        dark_mode_check.grid(row=row, column=0, columnspan=2)
+        row +=1
 
         # Button to configure positions
-        tk.Button(param_frame, text="Configure Positions", command=self.configure_positions).grid(row=9, column=0,
-                                                                                                  columnspan=2, pady=5)
+        tk.Button(param_frame, text="Configure Positions", command=self.configure_positions).grid(row=row, column=0, columnspan=2, pady=5)
+        row +=1
+
+        # Progress bars and timing labels
+        self.current_progress = tk.DoubleVar()
+        self.overall_progress = tk.DoubleVar()
+        self.current_progress_label = tk.StringVar()
+        self.overall_progress_label = tk.StringVar()
+        self.estimated_time_label = tk.StringVar(value="Estimated Time Remaining: N/A")
+
+        tk.Label(param_frame, text="Current Procedure Progress:").grid(row=row, column=0, sticky='e')
+        self.current_progress_bar = ttk.Progressbar(param_frame, variable=self.current_progress, maximum=100)
+        self.current_progress_bar.grid(row=row, column=1, sticky='we')
+        row +=1
+
+        self.current_progress_text = tk.Label(param_frame, textvariable=self.current_progress_label)
+        self.current_progress_text.grid(row=row, column=0, columnspan=2)
+        row +=1
+
+        tk.Label(param_frame, text="Overall Progress:").grid(row=row, column=0, sticky='e')
+        self.overall_progress_bar = ttk.Progressbar(param_frame, variable=self.overall_progress, maximum=100)
+        self.overall_progress_bar.grid(row=row, column=1, sticky='we')
+        row +=1
+
+        self.overall_progress_text = tk.Label(param_frame, textvariable=self.overall_progress_label)
+        self.overall_progress_text.grid(row=row, column=0, columnspan=2)
+        row +=1
+
+        self.estimated_time_text = tk.Label(param_frame, textvariable=self.estimated_time_label)
+        self.estimated_time_text.grid(row=row, column=0, columnspan=2)
+        row +=1
 
         # Frame for control buttons
         control_frame = tk.Frame(self.root)
@@ -335,8 +409,8 @@ class MacroGUI:
     def toggle_dark_mode(self):
         if self.dark_mode.get():
             # Set dark mode colors
-            bg_color = '#2e2e2e'  # Dark gray
-            fg_color = '#ffffff'  # White
+            bg_color = '#3a3a3a'  # Dark gray
+            fg_color = '#F8F8F2'  # Light gray
             self.root.configure(bg=bg_color)
             for widget in self.root.winfo_children():
                 self.set_widget_colors(widget, bg_color, fg_color)
@@ -399,7 +473,6 @@ class MacroGUI:
         tk.Button(pos_window, text="Save", command=save_positions).grid(row=row, column=0, columnspan=4, pady=5)
 
     def set_position(self, key, x_var, y_var):
-        # Remove the confirmation messagebox
         # Disable the GUI to prevent interactions
         self.root.attributes("-disabled", True)
 
@@ -419,6 +492,28 @@ class MacroGUI:
         # Re-enable the GUI
         self.root.attributes("-disabled", False)
 
+    def update_progress(self, current, total):
+        progress = (current / total) * 100
+        self.current_progress.set(progress)
+        self.current_progress_label.set(f"{current}/{total} ({progress:.2f}%)")
+        self.root.update_idletasks()
+
+    def update_overall_progress(self, current, total):
+        progress = (current / total) * 100
+        self.overall_progress.set(progress)
+        self.overall_progress_label.set(f"{current}/{total} ({progress:.2f}%)")
+        self.root.update_idletasks()
+
+    def update_estimated_time(self, iteration_times, remaining_iterations):
+        if iteration_times:
+            average_time = sum(iteration_times[-5:]) / min(len(iteration_times), 5)  # Average of last 5 iterations
+            estimated_time = average_time * remaining_iterations
+            minutes, seconds = divmod(estimated_time, 60)
+            self.estimated_time_label.set(f"Estimated Time Remaining: {int(minutes)}m {int(seconds)}s")
+        else:
+            self.estimated_time_label.set("Estimated Time Remaining: N/A")
+        self.root.update_idletasks()
+
     def start_script(self):
         if not self.running:
             self.running = True
@@ -433,6 +528,8 @@ class MacroGUI:
     def pause_script(self):
         if self.running:
             if pause_event.is_set():
+                # Reload configuration when resuming
+                self.reload_config()
                 pause_event.clear()
                 self.pause_button.config(text="Pause Script")
                 self.logger.info(Fore.MAGENTA + "Script resumed.")
@@ -441,9 +538,23 @@ class MacroGUI:
                 self.pause_button.config(text="Resume Script")
                 self.logger.info(Fore.MAGENTA + "Script paused.")
 
+    def reload_config(self):
+        # Re-fetch input parameters
+        self.logger.info(Fore.CYAN + "Reloading configuration...")
+        self.num_runs_value = self.num_runs.get()
+        self.cooking_repeat_value = self.cooking_repeat.get()
+        self.tick_time_value = self.tick_time.get()
+        self.speculative_mode_value = self.speculative_mode.get()
+        self.cooking_loop_target_value = self.cooking_loop_target.get()
+        self.interaction_wait_value = (self.interaction_wait_min.get(), self.interaction_wait_max.get())
+        self.positions_value = self.positions.copy()
+        self.mouse_method_value = self.mouse_method.get()
+        self.logger.info(Fore.CYAN + "Configuration reloaded.")
+
     def stop_script(self):
         if self.running:
             kill_event.set()
+            pause_event.clear()  # Ensure the script isn't paused
             self.script_thread.join()
             self.running = False
             self.start_button.config(state='normal')
@@ -451,40 +562,45 @@ class MacroGUI:
             self.stop_button.config(state='disabled')
             # Reset events
             start_event.clear()
-            pause_event.clear()
             kill_event.clear()
             self.logger.info(Fore.RED + "Script stopped.")
+            # Reset progress bars and labels
+            self.current_progress.set(0)
+            self.current_progress_label.set("")
+            self.overall_progress.set(0)
+            self.overall_progress_label.set("")
+            self.estimated_time_label.set("Estimated Time Remaining: N/A")
         else:
             messagebox.showinfo("Script Not Running", "The script is not running.")
 
     def run_script(self):
         # Retrieve input parameters
-        num_runs = self.num_runs.get()
-        cooking_repeat = self.cooking_repeat.get()
-        tick_time = self.tick_time.get()
-        interaction_wait = (self.interaction_wait_min.get(), self.interaction_wait_max.get())
-        positions = self.positions.copy()
-        interface_wait = self.interface_wait.get()
-        mouse_method = self.mouse_method.get()
+        self.reload_config()
 
         # Create mouse controller
-        mouse_controller = MouseController(method=mouse_method, interface_wait=interface_wait)
+        mouse_controller = MouseController(method=self.mouse_method_value)
 
         # Start the script
         self.logger.info(Fore.BLUE + "Script started.")
         try:
             run_number = 1
-            while run_number <= num_runs and not kill_event.is_set():
+            total_runs = self.num_runs_value
+            while run_number <= total_runs and not kill_event.is_set():
                 check_events()
-                BankingProcedure(run_number, positions, interaction_wait, self.logger, interface_wait, mouse_controller)
+                self.update_overall_progress(run_number - 1, total_runs)
+                BankingProcedure(run_number, self.positions_value, self.interaction_wait_value, self.logger, mouse_controller)
                 check_events()
-                CookingProcedure(run_number, cooking_repeat, tick_time, positions, interaction_wait, self.logger, interface_wait, mouse_controller)
+                CookingProcedure(run_number, self.cooking_repeat_value, self.tick_time_value, self.speculative_mode_value, self.cooking_loop_target_value, self.positions_value, self.interaction_wait_value, self.logger, mouse_controller, self)
                 run_number += 1
-            if run_number > num_runs:
+                self.update_overall_progress(run_number - 1, total_runs)
+            if run_number > total_runs:
                 self.logger.info(Fore.BLUE + "Completed all runs.")
                 self.stop_script()
         except KillScriptException:
             self.logger.info(Fore.RED + "Script terminated.")
+            self.stop_script()
+        except Exception as e:
+            self.logger.error(Fore.RED + f"An error occurred: {e}")
             self.stop_script()
 
     # Hotkey methods

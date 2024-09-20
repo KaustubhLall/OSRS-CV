@@ -36,3 +36,5 @@ lxml~=5.3.0
 torch~=2.4.0+cu124
 PyScreeze~=1.0.1
 keyboard~=0.13.5
+mouse~=0.7.1
+pynput~=1.7.7

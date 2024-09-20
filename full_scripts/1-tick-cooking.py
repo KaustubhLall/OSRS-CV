@@ -1,20 +1,25 @@
 import logging
 import random
-import sys
 import threading
 import time
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import scrolledtext
+from tkinter import ttk
 import functools
+import re
 
-import keyboard
-import mouse
+import mouse  # For capturing mouse clicks
+import pyautogui  # For mouse movements and clicks
 from colorama import init, Fore
-from pyHM import mouse as hm_mouse
+from pynput.keyboard import Key, Controller  # For keyboard control
+from pynput import keyboard as pynput_keyboard  # For global hotkeys
 
 # Initialize colorama
 init(autoreset=True)
+
+# Initialize pynput keyboard controller
+keyboard_controller = Controller()
 
 # Configurable positions (default values)
 default_positions = {
@@ -30,50 +35,87 @@ start_event = threading.Event()
 pause_event = threading.Event()
 kill_event = threading.Event()
 
-pyHM_mult = 0.5  # Multiplier for mouse movement speed
-
-
 class KillScriptException(Exception):
     """Custom exception to handle script termination."""
     pass
 
+class MouseController:
+    def __init__(self, method='standard', interface_wait=0.5):
+        self.method = method
+        self.interface_wait = interface_wait  # Wait time after interactions
 
-class ScriptLogger:
-    """Class to handle logging within the GUI."""
+    def move(self, x, y, duration=0):
+        if self.method == 'standard':
+            pyautogui.moveTo(x, y, duration=duration)
+        elif self.method == 'pyhm':
+            pass  # Placeholder for pyHM implementation
 
-    def __init__(self, text_widget, log_file):
+    def click(self):
+        if self.method == 'standard':
+            pyautogui.click()
+        elif self.method == 'pyhm':
+            pass  # Placeholder for pyHM implementation
+
+    def double_click(self):
+        if self.method == 'standard':
+            pyautogui.doubleClick()
+        elif self.method == 'pyhm':
+            pass  # Placeholder for pyHM implementation
+
+class TextHandler(logging.Handler):
+    """Logging handler that outputs log messages to a Tkinter Text widget."""
+
+    def __init__(self, text_widget):
+        logging.Handler.__init__(self)
         self.text_widget = text_widget
-        self.log_file = log_file
-        self.log_lock = threading.Lock()
+        # Configure text tags for colors
+        self.text_widget.tag_config('RED', foreground='red')
+        self.text_widget.tag_config('GREEN', foreground='green')
+        self.text_widget.tag_config('YELLOW', foreground='yellow')
+        self.text_widget.tag_config('BLUE', foreground='blue')
+        self.text_widget.tag_config('MAGENTA', foreground='magenta')
+        self.text_widget.tag_config('CYAN', foreground='cyan')
+        self.text_widget.tag_config('RESET', foreground='black')
+        # Regular expression to match ANSI escape sequences
+        self.ANSI_ESCAPE_RE = re.compile(r'\x1b\[(\d+)(;\d+)*m')
+        self.COLOR_MAP = {
+            '30': 'BLACK',
+            '31': 'RED',
+            '32': 'GREEN',
+            '33': 'YELLOW',
+            '34': 'BLUE',
+            '35': 'MAGENTA',
+            '36': 'CYAN',
+            '37': 'WHITE',
+        }
 
-        # Set up logging
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s %(message)s',
-            datefmt='%H:%M:%S',
-            handlers=[
-                logging.FileHandler(self.log_file),
-                logging.StreamHandler(sys.stdout)
-            ]
-        )
-        self.logger = logging.getLogger()
-
-    def write(self, message):
-        with self.log_lock:
+    def emit(self, record):
+        msg = self.format(record)
+        # Remove ANSI color codes and apply tags
+        pos = 0
+        last_tag = 'RESET'
+        for match in self.ANSI_ESCAPE_RE.finditer(msg):
+            start, end = match.span()
+            text = msg[pos:start]
+            if text:
+                self.text_widget.configure(state='normal')
+                self.text_widget.insert(tk.END, text, last_tag)
+                self.text_widget.configure(state='disabled')
+            color_codes = match.group().strip('\x1b[').strip('m').split(';')
+            last_tag = self.COLOR_MAP.get(color_codes[0], 'RESET')
+            pos = end
+        # Insert the remaining text
+        text = msg[pos:] + '\n'
+        if text:
             self.text_widget.configure(state='normal')
-            self.text_widget.insert(tk.END, message)
+            self.text_widget.insert(tk.END, text, last_tag)
             self.text_widget.configure(state='disabled')
-            self.text_widget.see(tk.END)
-            self.logger.info(message.strip())
-
-    def flush(self):
-        pass  # For compatibility with file-like object
-
+        # Scroll to the end
+        self.text_widget.see(tk.END)
 
 def INTERACTION_WAIT(min_wait, max_wait):
     """Returns a random interaction wait time between min_wait and max_wait."""
     return random.uniform(min_wait, max_wait)
-
 
 def check_events():
     """Checks for kill and pause events."""
@@ -82,88 +124,102 @@ def check_events():
     while pause_event.is_set():
         time.sleep(0.1)
 
+def press_key_continuously(key, stop_event, interval=0.05):
+    """Presses a key continuously at specified intervals until stopped."""
+    while not stop_event.is_set():
+        keyboard_controller.press(key)
+        keyboard_controller.release(key)
+        time.sleep(interval)
 
-def BankingProcedure(run_number, positions, interaction_wait, logger):
+def BankingProcedure(run_number, positions, interaction_wait, logger, interface_wait, mouse_controller):
     """Performs the banking procedure."""
-    print(Fore.CYAN + f"Starting Banking Procedure (Run {run_number})...")
+    logger.info(Fore.CYAN + f"Starting Banking Procedure (Run {run_number})...")
     wait_time = INTERACTION_WAIT(*interaction_wait)
     check_events()
-    print(Fore.YELLOW + "Moving to bank position.")
-    hm_mouse.move(*positions['bank_pos'], multiplier=pyHM_mult)
+    logger.info(Fore.YELLOW + "Moving to bank position.")
+    mouse_controller.move(*positions['bank_pos'], duration=wait_time)
     time.sleep(wait_time)
-    hm_mouse.click()
-
-    wait_time = INTERACTION_WAIT(*interaction_wait)
-    check_events()
-    print(Fore.YELLOW + "Moving to deposit all position.")
-    hm_mouse.move(*positions['deposit_all_pos'], multiplier=pyHM_mult)
-    time.sleep(wait_time)
-    hm_mouse.click()
+    mouse_controller.click()
+    time.sleep(interface_wait)  # Interface wait
 
     wait_time = INTERACTION_WAIT(*interaction_wait)
     check_events()
-    print(Fore.YELLOW + "Moving to bank item position.")
-    hm_mouse.move(*positions['bank_item_pos'], multiplier=pyHM_mult)
+    logger.info(Fore.YELLOW + "Moving to deposit all position.")
+    mouse_controller.move(*positions['deposit_all_pos'], duration=wait_time)
     time.sleep(wait_time)
-    print(Fore.YELLOW + "Performing shift double-click on bank item.")
-    keyboard.press('shift')
-    hm_mouse.double_click()
-    keyboard.release('shift')
+    mouse_controller.click()
+    time.sleep(interface_wait)  # Interface wait
 
+    wait_time = INTERACTION_WAIT(*interaction_wait)
+    check_events()
+    logger.info(Fore.YELLOW + "Moving to bank item position.")
+    mouse_controller.move(*positions['bank_item_pos'], duration=wait_time)
     time.sleep(wait_time)
-    print(Fore.YELLOW + "Pressing ESC to close bank interface.")
-    keyboard.press_and_release('esc')
-    keyboard.press_and_release('esc')
+    logger.info(Fore.YELLOW + "Performing shift double-click on bank item.")
+    keyboard_controller.press(Key.shift)
+    mouse_controller.double_click()
+    keyboard_controller.release(Key.shift)
+    time.sleep(interface_wait)  # Interface wait
 
-    print(Fore.CYAN + f"Completed Banking Procedure (Run {run_number}).")
+    logger.info(Fore.YELLOW + "Pressing ESC to close bank interface.")
+    keyboard_controller.press(Key.esc)
+    keyboard_controller.release(Key.esc)
+    keyboard_controller.press(Key.esc)
+    keyboard_controller.release(Key.esc)
+    time.sleep(interface_wait)  # Interface wait
 
+    logger.info(Fore.CYAN + f"Completed Banking Procedure (Run {run_number}).")
 
-def CookingProcedure(run_number, cooking_repeat, tick_time, positions, interaction_wait, logger):
+def CookingProcedure(run_number, cooking_repeat, tick_time, positions, interaction_wait, logger, interface_wait, mouse_controller):
     """Performs the cooking procedure."""
-    print(Fore.GREEN + f"Starting Cooking Procedure (Run {run_number})...")
+    logger.info(Fore.GREEN + f"Starting Cooking Procedure (Run {run_number})...")
     wait_time = INTERACTION_WAIT(*interaction_wait)
     check_events()
-    print(Fore.YELLOW + "Pressing 'q' to open inventory.")
-    keyboard.press_and_release('q')
+    logger.info(Fore.YELLOW + "Pressing 'q' to open inventory.")
+    keyboard_controller.press('q')
+    keyboard_controller.release('q')
     time.sleep(wait_time)
-    print(Fore.YELLOW + "Pressing 'w' to open cooking interface.")
-    keyboard.press_and_release('w')
-    time.sleep(wait_time * 2)  # Wait for the interface to load
+    logger.info(Fore.YELLOW + "Pressing 'w' to open cooking interface.")
+    keyboard_controller.press('w')
+    keyboard_controller.release('w')
+    time.sleep(wait_time * 2)  # Wait for the interface to load/ todo change to interface time
 
-    # Press and hold the confirmation button (key '1')
-    print(Fore.YELLOW + "Holding down confirmation button '1'.")
-    keyboard.press('1')
+    # Start pressing '1' continuously
+    stop_event = threading.Event()
+    key_thread = threading.Thread(target=press_key_continuously, args=('1', stop_event)) # todo fix this code running even when script is paused
+    key_thread.start()
 
-    for i in range(1, cooking_repeat + 1):
-        check_events()
-        start_time = time.time()
+    try:
+        for i in range(1, cooking_repeat + 1):
+            check_events()
+            start_time = time.time()
 
-        print(Fore.YELLOW + f"Cooking loop iteration {i}/{cooking_repeat}.")
+            logger.info(Fore.YELLOW + f"Cooking loop iteration {i}/{cooking_repeat}.")
 
-        wait_time = INTERACTION_WAIT(*interaction_wait)
-        hm_mouse.move(*positions['inven_food_pos'], multiplier=pyHM_mult)
-        time.sleep(wait_time)
-        hm_mouse.click()
+            wait_time = INTERACTION_WAIT(*interaction_wait)
+            mouse_controller.move(*positions['inven_food_pos'], duration=wait_time)
+            time.sleep(wait_time)
+            mouse_controller.click()
 
-        wait_time = INTERACTION_WAIT(*interaction_wait)
-        hm_mouse.move(*positions['cook_food_pos'], multiplier=pyHM_mult)
-        time.sleep(wait_time)
-        hm_mouse.click()
+            wait_time = INTERACTION_WAIT(*interaction_wait)
+            mouse_controller.move(*positions['cook_food_pos'], duration=wait_time)
+            time.sleep(wait_time)
+            mouse_controller.click()
 
-        # Sleep for one tick
-        time.sleep(tick_time)
+            # Sleep for one tick/ # todo configurable to dynamically calculate this based on time elapsed since start time
+            time.sleep(tick_time)
 
-        # Ensure the loop takes between 600-700 ms
-        elapsed_time = time.time() - start_time
-        if elapsed_time < 0.6:
-            time.sleep(0.6 - elapsed_time)
-        elif elapsed_time > 0.7:
-            print(Fore.RED + "Warning: Cooking loop took longer than 700 ms.")
-
-    # Release the confirmation button
-    keyboard.release('1')
-    print(Fore.GREEN + f"Completed Cooking Procedure (Run {run_number}).")
-
+            # Ensure the loop takes between 600-700 ms
+            elapsed_time = time.time() - start_time
+            if elapsed_time < 0.6:
+                time.sleep(0.6 - elapsed_time)
+            elif elapsed_time > 0.7:
+                logger.warning(Fore.RED + "Warning: Cooking loop took longer than 700 ms.")
+    finally:
+        # Stop the key pressing thread
+        stop_event.set()
+        key_thread.join()
+        logger.info(Fore.GREEN + f"Completed Cooking Procedure (Run {run_number}).")
 
 class MacroGUI:
     def __init__(self, root):
@@ -178,18 +234,44 @@ class MacroGUI:
         self.interaction_wait_min = tk.DoubleVar(value=0.02)
         self.interaction_wait_max = tk.DoubleVar(value=0.05)
         self.positions = default_positions.copy()
+        self.mouse_method = tk.StringVar(value='standard')
+        self.interface_wait = tk.DoubleVar(value=0.5)
+        self.font_size = tk.IntVar(value=10)
+        self.dark_mode = tk.BooleanVar(value=False)
 
         self.create_widgets()
         self.log_file = "macro_script.log"
 
-        # Redirect stdout to the text widget
-        self.logger = ScriptLogger(self.log_output, self.log_file)
-        sys.stdout = self.logger
+        # Set up logging
+        self.logger = logging.getLogger('MacroLogger')
+        self.logger.setLevel(logging.INFO)
 
-        # Set up hotkeys
-        keyboard.add_hotkey('alt+x', self.hotkey_start_script)
-        keyboard.add_hotkey('alt+c', self.hotkey_pause_script)
-        keyboard.add_hotkey('f1', self.hotkey_stop_script)
+        # Create file handler
+        file_handler = logging.FileHandler(self.log_file)
+        file_handler.setLevel(logging.INFO)
+        file_formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s', datefmt='%H:%M:%S')
+        file_handler.setFormatter(file_formatter)
+
+        # Create GUI handler
+        gui_handler = TextHandler(self.log_output)
+        gui_handler.setLevel(logging.INFO)
+        gui_formatter = logging.Formatter('%(message)s')
+        gui_handler.setFormatter(gui_formatter)
+
+        # Add handlers to logger
+        self.logger.addHandler(file_handler)
+        self.logger.addHandler(gui_handler)
+
+        # Set up global hotkeys using pynput
+        self.hotkey_listener = pynput_keyboard.GlobalHotKeys({
+            '<alt>+x': self.hotkey_start_script,
+            '<alt>+c': self.hotkey_pause_script,
+            '<f1>': self.hotkey_stop_script
+        })
+        self.hotkey_listener.start()
+
+        # Bind font size change
+        self.font_size.trace('w', self.update_font_size)
 
     def create_widgets(self):
         # Frame for input parameters
@@ -211,8 +293,21 @@ class MacroGUI:
         tk.Label(param_frame, text="Interaction Wait Max (s):").grid(row=4, column=0, sticky='e')
         tk.Entry(param_frame, textvariable=self.interaction_wait_max).grid(row=4, column=1)
 
+        tk.Label(param_frame, text="Mouse Method:").grid(row=5, column=0, sticky='e')
+        mouse_method_option = tk.OptionMenu(param_frame, self.mouse_method, 'standard', 'pyhm')
+        mouse_method_option.grid(row=5, column=1)
+
+        tk.Label(param_frame, text="Interface Wait (s):").grid(row=6, column=0, sticky='e')
+        tk.Entry(param_frame, textvariable=self.interface_wait).grid(row=6, column=1)
+
+        tk.Label(param_frame, text="Font Size:").grid(row=7, column=0, sticky='e')
+        tk.Entry(param_frame, textvariable=self.font_size).grid(row=7, column=1)
+
+        dark_mode_check = tk.Checkbutton(param_frame, text="Dark Mode", variable=self.dark_mode, command=self.toggle_dark_mode)
+        dark_mode_check.grid(row=8, column=0, columnspan=2)
+
         # Button to configure positions
-        tk.Button(param_frame, text="Configure Positions", command=self.configure_positions).grid(row=5, column=0,
+        tk.Button(param_frame, text="Configure Positions", command=self.configure_positions).grid(row=9, column=0,
                                                                                                   columnspan=2, pady=5)
 
         # Frame for control buttons
@@ -229,8 +324,38 @@ class MacroGUI:
         self.stop_button.grid(row=0, column=2, padx=5)
 
         # Log output
-        self.log_output = scrolledtext.ScrolledText(self.root, state='disabled', width=80, height=20)
+        font_size = self.font_size.get()
+        self.log_output = scrolledtext.ScrolledText(self.root, state='disabled', width=80, height=20, font=('TkDefaultFont', font_size))
         self.log_output.pack(pady=10)
+
+    def update_font_size(self, *args):
+        font_size = self.font_size.get()
+        self.log_output.configure(font=('TkDefaultFont', font_size))
+
+    def toggle_dark_mode(self):
+        if self.dark_mode.get():
+            # Set dark mode colors
+            bg_color = '#2e2e2e'  # Dark gray
+            fg_color = '#ffffff'  # White
+            self.root.configure(bg=bg_color)
+            for widget in self.root.winfo_children():
+                self.set_widget_colors(widget, bg_color, fg_color)
+        else:
+            # Set light mode colors
+            bg_color = '#f0f0f0'  # Default light gray
+            fg_color = '#000000'  # Black
+            self.root.configure(bg=bg_color)
+            for widget in self.root.winfo_children():
+                self.set_widget_colors(widget, bg_color, fg_color)
+
+    def set_widget_colors(self, widget, bg_color, fg_color):
+        try:
+            widget.configure(bg=bg_color, fg=fg_color)
+        except:
+            pass
+        if isinstance(widget, (tk.Frame, tk.LabelFrame)):
+            for child in widget.winfo_children():
+                self.set_widget_colors(child, bg_color, fg_color)
 
     def configure_positions(self):
         # Simple dialog to show positions and allow editing
@@ -274,7 +399,7 @@ class MacroGUI:
         tk.Button(pos_window, text="Save", command=save_positions).grid(row=row, column=0, columnspan=4, pady=5)
 
     def set_position(self, key, x_var, y_var):
-        messagebox.showinfo("Set Position", "Please click to set the position.")
+        # Remove the confirmation messagebox
         # Disable the GUI to prevent interactions
         self.root.attributes("-disabled", True)
 
@@ -310,11 +435,11 @@ class MacroGUI:
             if pause_event.is_set():
                 pause_event.clear()
                 self.pause_button.config(text="Pause Script")
-                print(Fore.MAGENTA + "Script resumed.")
+                self.logger.info(Fore.MAGENTA + "Script resumed.")
             else:
                 pause_event.set()
                 self.pause_button.config(text="Resume Script")
-                print(Fore.MAGENTA + "Script paused.")
+                self.logger.info(Fore.MAGENTA + "Script paused.")
 
     def stop_script(self):
         if self.running:
@@ -328,7 +453,7 @@ class MacroGUI:
             start_event.clear()
             pause_event.clear()
             kill_event.clear()
-            print(Fore.RED + "Script stopped.")
+            self.logger.info(Fore.RED + "Script stopped.")
         else:
             messagebox.showinfo("Script Not Running", "The script is not running.")
 
@@ -339,22 +464,27 @@ class MacroGUI:
         tick_time = self.tick_time.get()
         interaction_wait = (self.interaction_wait_min.get(), self.interaction_wait_max.get())
         positions = self.positions.copy()
+        interface_wait = self.interface_wait.get()
+        mouse_method = self.mouse_method.get()
+
+        # Create mouse controller
+        mouse_controller = MouseController(method=mouse_method, interface_wait=interface_wait)
 
         # Start the script
-        print(Fore.BLUE + "Script started.")
+        self.logger.info(Fore.BLUE + "Script started.")
         try:
             run_number = 1
             while run_number <= num_runs and not kill_event.is_set():
                 check_events()
-                BankingProcedure(run_number, positions, interaction_wait, self.logger)
+                BankingProcedure(run_number, positions, interaction_wait, self.logger, interface_wait, mouse_controller)
                 check_events()
-                CookingProcedure(run_number, cooking_repeat, tick_time, positions, interaction_wait, self.logger)
+                CookingProcedure(run_number, cooking_repeat, tick_time, positions, interaction_wait, self.logger, interface_wait, mouse_controller)
                 run_number += 1
             if run_number > num_runs:
-                print(Fore.BLUE + "Completed all runs.")
+                self.logger.info(Fore.BLUE + "Completed all runs.")
                 self.stop_script()
         except KillScriptException:
-            print(Fore.RED + "Script terminated.")
+            self.logger.info(Fore.RED + "Script terminated.")
             self.stop_script()
 
     # Hotkey methods
@@ -366,7 +496,6 @@ class MacroGUI:
 
     def hotkey_stop_script(self):
         self.root.after(0, self.stop_script)
-
 
 if __name__ == "__main__":
     # Create the main window

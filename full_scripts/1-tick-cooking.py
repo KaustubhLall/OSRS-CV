@@ -6,7 +6,7 @@ import threading
 import time
 import tkinter as tk
 from tkinter import messagebox
-from tkinter import scrolledtext
+from tkinter import scrolledtext, ttk
 
 import mouse  # For capturing mouse clicks
 import pyautogui  # For mouse movements and clicks
@@ -67,29 +67,53 @@ class MouseController:
 class TextHandler(logging.Handler):
     """Logging handler that outputs log messages to a Tkinter Text widget."""
 
-    def __init__(self, text_widget):
+    def __init__(self, text_widget, dark_mode=False):
         logging.Handler.__init__(self)
         self.text_widget = text_widget
+        self.dark_mode = dark_mode
         # Configure text tags for colors
-        self.text_widget.tag_config('RED', foreground='red')
-        self.text_widget.tag_config('GREEN', foreground='green')
-        self.text_widget.tag_config('YELLOW', foreground='yellow')
-        self.text_widget.tag_config('BLUE', foreground='blue')
-        self.text_widget.tag_config('MAGENTA', foreground='magenta')
-        self.text_widget.tag_config('CYAN', foreground='cyan')
-        self.text_widget.tag_config('RESET', foreground='black')
+        self.configure_tags()
         # Regular expression to match ANSI escape sequences
         self.ANSI_ESCAPE_RE = re.compile(r'\x1b\[(\d+)(;\d+)*m')
         self.COLOR_MAP = {
             '30': 'BLACK',
             '31': 'RED',
             '32': 'GREEN',
-            '33': 'YELLOW',
+            '33': 'BLACK',  # Changed from YELLOW to BLACK for better visibility
             '34': 'BLUE',
-            '35': 'MAGENTA',
+            '35': 'MAGENTA',  # Changed from MAGENTA to MAGENTA
             '36': 'CYAN',
             '37': 'WHITE',
         }
+
+    def configure_tags(self):
+        # Define a color scheme that's visible on both light and dark backgrounds
+        if self.dark_mode:
+            self.text_widget.tag_config('BLACK', foreground='#A9B7C6')
+            self.text_widget.tag_config('RED', foreground='#FF5555')
+            self.text_widget.tag_config('GREEN', foreground='#50FA7B')
+            self.text_widget.tag_config('BLACK', foreground='#FFB86C')
+            self.text_widget.tag_config('BLUE', foreground='#BD93F9')
+            self.text_widget.tag_config('MAGENTA', foreground='#FF79C6')
+            self.text_widget.tag_config('CYAN', foreground='#8BE9FD')
+            self.text_widget.tag_config('WHITE', foreground='#FFFFFF')
+            self.text_widget.tag_config('RESET', foreground='#FFFFFF')
+        else:
+            self.text_widget.tag_config('BLACK', foreground='black')
+            self.text_widget.tag_config('RED', foreground='red')
+            self.text_widget.tag_config('GREEN', foreground='green')
+            self.text_widget.tag_config('BLACK', foreground='BLACK')
+            self.text_widget.tag_config('BLUE', foreground='blue')
+            self.text_widget.tag_config('MAGENTA', foreground='MAGENTA')
+            self.text_widget.tag_config('CYAN', foreground='cyan')
+            self.text_widget.tag_config('WHITE', foreground='white')
+            self.text_widget.tag_config('RESET', foreground='black')
+
+        # Bold font for certain tags
+        self.text_widget.tag_config('ERROR', foreground='red', font=('TkDefaultFont', 10, 'bold'))
+        self.text_widget.tag_config('WARNING', foreground='BLACK', font=('TkDefaultFont', 10, 'bold'))
+        self.text_widget.tag_config('INFO', foreground='green', font=('TkDefaultFont', 10, 'bold'))
+        self.text_widget.tag_config('DEBUG', foreground='blue', font=('TkDefaultFont', 10, 'bold'))
 
     def emit(self, record):
         msg = self.format(record)
@@ -144,132 +168,6 @@ def press_key_continuously(key, stop_event, interval=0.05):
         time.sleep(interval)
 
 
-def BankingProcedure(run_number, positions, interaction_wait, logger, interface_wait, mouse_controller):
-    """Performs the banking procedure."""
-    logger.info(Fore.CYAN + f"Starting Banking Procedure (Run {run_number})...")
-    wait_time = INTERACTION_WAIT(*interaction_wait)
-    check_events()
-    logger.info(Fore.YELLOW + "Moving to bank position.")
-    mouse_controller.move(*positions['bank_pos'], duration=wait_time)
-    time.sleep(wait_time)
-    mouse_controller.click()
-    time.sleep(interface_wait)  # Interface wait
-
-    wait_time = INTERACTION_WAIT(*interaction_wait)
-    check_events()
-    logger.info(Fore.YELLOW + "Moving to deposit all position.")
-    mouse_controller.move(*positions['deposit_all_pos'], duration=wait_time)
-    time.sleep(wait_time)
-    mouse_controller.click()
-    time.sleep(interface_wait)  # Interface wait
-
-    wait_time = INTERACTION_WAIT(*interaction_wait)
-    check_events()
-    logger.info(Fore.YELLOW + "Moving to bank item position.")
-    mouse_controller.move(*positions['bank_item_pos'], duration=wait_time)
-    time.sleep(wait_time)
-    logger.info(Fore.YELLOW + "Performing shift double-click on bank item.")
-    keyboard_controller.press(Key.shift)
-    mouse_controller.double_click()
-    keyboard_controller.release(Key.shift)
-    time.sleep(interface_wait)  # Interface wait
-
-    logger.info(Fore.YELLOW + "Pressing ESC to close bank interface.")
-    keyboard_controller.press(Key.esc)
-    keyboard_controller.release(Key.esc)
-    keyboard_controller.press(Key.esc)
-    keyboard_controller.release(Key.esc)
-    time.sleep(interface_wait)  # Interface wait
-
-    logger.info(Fore.CYAN + f"Completed Banking Procedure (Run {run_number}).")
-
-
-def CookingProcedure(run_number, cooking_repeat, tick_time, speculative_mode, cooking_loop_target, positions,
-                     interaction_wait, logger, interface_wait, mouse_controller):
-    """Performs the cooking procedure."""
-    logger.info(Fore.GREEN + f"Starting Cooking Procedure (Run {run_number})...")
-    wait_time = INTERACTION_WAIT(*interaction_wait)
-    check_events()
-    logger.info(Fore.YELLOW + "Pressing 'q' to open inventory.")
-    keyboard_controller.press('q')
-    keyboard_controller.release('q')
-    time.sleep(wait_time)
-    logger.info(Fore.YELLOW + "Pressing 'w' to open cooking interface.")
-    keyboard_controller.press('w')
-    keyboard_controller.release('w')
-
-    # Start pressing '1' continuously
-    stop_event = threading.Event()
-    key_thread = threading.Thread(target=press_key_continuously, args=('1', stop_event))
-    key_thread.start()
-
-    total_start_time = time.time()
-    step_times_list = []
-
-    try:
-        for i in range(1, cooking_repeat + 1):
-            check_events()
-            loop_start_time = time.time()
-            step_times = {}
-
-            logger.info(Fore.YELLOW + f"Cooking loop iteration {i}/{cooking_repeat}.")
-
-            # Step 1: Move to inven_food_pos and click
-            step_start = time.time()
-            wait_time = INTERACTION_WAIT(*interaction_wait)
-            mouse_controller.move(*positions['inven_food_pos'], duration=wait_time)
-            time.sleep(wait_time)
-            mouse_controller.click()
-            step_times['Step 1'] = time.time() - step_start
-
-            # Step 2: Move to cook_food_pos and click
-            step_start = time.time()
-            wait_time = INTERACTION_WAIT(*interaction_wait)
-            mouse_controller.move(*positions['cook_food_pos'], duration=wait_time)
-            time.sleep(wait_time)
-            mouse_controller.click()
-            step_times['Step 2'] = time.time() - step_start
-
-            # Calculate elapsed time
-            elapsed_time = time.time() - loop_start_time
-
-            if speculative_mode:
-                # Adjust sleep time to match cooking_loop_target
-                sleep_time = cooking_loop_target - elapsed_time
-                if sleep_time > 0:
-                    time.sleep(sleep_time)
-                else:
-                    logger.warning(
-                        Fore.RED + f"Warning: Cooking loop took longer than {cooking_loop_target:.4f} seconds.")
-            else:
-                # Sleep for tick_time
-                sleep_time = tick_time - elapsed_time
-                if sleep_time > 0:
-                    time.sleep(sleep_time)
-                else:
-                    logger.warning(
-                        Fore.RED + f"Warning: Cooking loop took longer than tick_time ({tick_time:.4f} seconds).")
-                    logger.info(
-                        Fore.BLUE + f"Tick time: {tick_time:.4f}s, Target - Start Time: {tick_time - elapsed_time:.4f}s")
-
-            # Record total time for this iteration
-            total_loop_time = time.time() - loop_start_time
-            step_times['Total Loop'] = total_loop_time
-            step_times_list.append(step_times)
-            logger.info(Fore.BLUE + f"Iteration {i} times: {step_times}")
-
-    finally:
-        # Stop the key pressing thread
-        stop_event.set()
-        key_thread.join()
-        total_execution_time = time.time() - total_start_time
-        logger.info(Fore.GREEN + f"Completed Cooking Procedure (Run {run_number}).")
-        logger.info(Fore.BLUE + f"Total execution time: {total_execution_time:.4f} seconds.")
-        # Print step times
-        for idx, times in enumerate(step_times_list, 1):
-            logger.info(Fore.BLUE + f"Iteration {idx} times: {times}")
-
-
 class MacroGUI:
     def __init__(self, root):
         self.root = root
@@ -304,7 +202,7 @@ class MacroGUI:
         file_handler.setFormatter(file_formatter)
 
         # Create GUI handler
-        gui_handler = TextHandler(self.log_output)
+        gui_handler = TextHandler(self.log_output, dark_mode=self.dark_mode.get())
         gui_handler.setLevel(logging.INFO)
         gui_formatter = logging.Formatter('%(message)s')
         gui_handler.setFormatter(gui_formatter)
@@ -394,6 +292,34 @@ class MacroGUI:
         self.stop_button = tk.Button(control_frame, text="Stop Script", command=self.stop_script, state='disabled')
         self.stop_button.grid(row=0, column=2, padx=5)
 
+        # Frame for progress bars
+        progress_frame = tk.Frame(self.root)
+        progress_frame.pack(pady=10, fill='x')
+
+        # Current Procedure Progress
+        current_proc_label = tk.Label(progress_frame, text="Current Procedure Progress:")
+        current_proc_label.grid(row=0, column=0, sticky='w')
+        self.current_progress = ttk.Progressbar(progress_frame, length=400, mode='determinate')
+        self.current_progress.grid(row=1, column=0, padx=5, pady=5)
+        self.current_progress_label = tk.Label(progress_frame, text="0/2 Steps (0.00%)")
+        self.current_progress_label.grid(row=1, column=1, padx=5)
+        self.current_progress_eta_label = tk.Label(progress_frame, text="ETA: Calculating...")
+        self.current_progress_eta_label.grid(row=1, column=2, padx=5)
+        self.current_progress_percent_label = tk.Label(progress_frame, text="0.00%")
+        self.current_progress_percent_label.grid(row=1, column=3, padx=5)
+
+        # Overall Progress
+        overall_label = tk.Label(progress_frame, text="Overall Progress:")
+        overall_label.grid(row=2, column=0, sticky='w')
+        self.overall_progress = ttk.Progressbar(progress_frame, length=400, mode='determinate')
+        self.overall_progress.grid(row=3, column=0, padx=5, pady=5)
+        self.overall_progress_label = tk.Label(progress_frame, text="0/10 Runs (0.00%)")
+        self.overall_progress_label.grid(row=3, column=1, padx=5)
+        self.overall_progress_eta_label = tk.Label(progress_frame, text="ETA: Calculating...")
+        self.overall_progress_eta_label.grid(row=3, column=2, padx=5)
+        self.overall_progress_percent_label = tk.Label(progress_frame, text="0.00%")
+        self.overall_progress_percent_label.grid(row=3, column=3, padx=5)
+
         # Log output
         font_size = self.font_size.get()
         self.log_output = scrolledtext.ScrolledText(self.root, state='disabled', width=80, height=20,
@@ -412,6 +338,11 @@ class MacroGUI:
             self.root.configure(bg=bg_color)
             for widget in self.root.winfo_children():
                 self.set_widget_colors(widget, bg_color, fg_color)
+            # Update log handler colors
+            for handler in self.logger.handlers:
+                if isinstance(handler, TextHandler):
+                    handler.dark_mode = True
+                    handler.configure_tags()
         else:
             # Set light mode colors
             bg_color = '#f0f0f0'  # Default light gray
@@ -419,6 +350,11 @@ class MacroGUI:
             self.root.configure(bg=bg_color)
             for widget in self.root.winfo_children():
                 self.set_widget_colors(widget, bg_color, fg_color)
+            # Update log handler colors
+            for handler in self.logger.handlers:
+                if isinstance(handler, TextHandler):
+                    handler.dark_mode = False
+                    handler.configure_tags()
 
     def set_widget_colors(self, widget, bg_color, fg_color):
         try:
@@ -526,8 +462,24 @@ class MacroGUI:
             start_event.clear()
             kill_event.clear()
             self.logger.info(Fore.RED + "Script stopped.")
+            # Reset progress bars
+            self.reset_progress_bars()
         else:
             messagebox.showinfo("Script Not Running", "The script is not running.")
+
+    def reset_progress_bars(self):
+        # Reset Current Procedure Progress
+        self.current_progress['value'] = 0
+        self.current_progress_label.config(text="0/2 Steps (0.00%)")
+        self.current_progress_eta_label.config(text="ETA: Calculating...")
+        self.current_progress_percent_label.config(text="0.00%")
+
+        # Reset Overall Progress
+        self.overall_progress['value'] = 0
+        num_runs = self.num_runs.get()
+        self.overall_progress_label.config(text=f"0/{num_runs} Runs (0.00%)")
+        self.overall_progress_eta_label.config(text="ETA: Calculating...")
+        self.overall_progress_percent_label.config(text="0.00%")
 
     def run_script(self):
         # Retrieve input parameters
@@ -544,26 +496,215 @@ class MacroGUI:
         # Create mouse controller
         mouse_controller = MouseController(method=mouse_method, interface_wait=interface_wait)
 
+        # Initialize progress bars
+        self.current_progress['maximum'] = 2 * cooking_repeat  # Assuming 2 steps per iteration
+        self.overall_progress['maximum'] = num_runs
+        self.overall_progress_label.config(text=f"0/{num_runs} Runs (0.00%)")
+        self.overall_progress_eta_label.config(text="ETA: Calculating...")
+        self.overall_progress_percent_label.config(text="0.00%")
+
         # Start the script
         self.logger.info(Fore.BLUE + "Script started.")
+        overall_run_start_time = time.time()
         try:
-            run_number = 1
-            while run_number <= num_runs and not kill_event.is_set():
+            for run_number in range(1, num_runs + 1):
                 check_events()
-                BankingProcedure(run_number, positions, interaction_wait, self.logger, interface_wait, mouse_controller)
+                self.update_overall_progress(run_number, num_runs, overall_run_start_time)
+                self.banking_procedure(run_number, positions, interaction_wait, interface_wait, mouse_controller)
                 check_events()
-                CookingProcedure(run_number, cooking_repeat, tick_time, speculative_mode, cooking_loop_target,
-                                 positions, interaction_wait, self.logger, interface_wait, mouse_controller)
-                run_number += 1
-            if run_number > num_runs:
-                self.logger.info(Fore.BLUE + "Completed all runs.")
-                self.stop_script()
+                self.cooking_procedure(run_number, cooking_repeat, tick_time, speculative_mode, cooking_loop_target,
+                                       positions, interaction_wait, interface_wait, mouse_controller)
+            self.logger.info(Fore.BLUE + "Completed all runs.")
+            self.stop_script()
         except KillScriptException:
             self.logger.info(Fore.RED + "Script terminated.")
             self.stop_script()
         except Exception as e:
             self.logger.error(Fore.RED + f"An error occurred: {e}")
             self.stop_script()
+
+    def update_overall_progress(self, run_number, total_runs, start_time):
+        """Updates the overall progress bar and ETA."""
+        percent = (run_number / total_runs) * 100
+        self.overall_progress['value'] = run_number
+        self.overall_progress_label.config(text=f"{run_number}/{total_runs} Runs ({percent:.2f}%)")
+        # Calculate ETA
+        elapsed = time.time() - start_time
+        if run_number > 0:
+            average_time_per_run = elapsed / run_number
+            remaining_runs = total_runs - run_number
+            eta = average_time_per_run * remaining_runs
+            eta_str = time.strftime("%H:%M:%S", time.gmtime(eta))
+        else:
+            eta_str = "Calculating..."
+        self.overall_progress_eta_label.config(text=f"ETA: {eta_str}")
+        self.overall_progress_percent_label.config(text=f"{percent:.2f}%")
+
+    def update_current_progress(self, steps_completed, total_steps, eta):
+        """Updates the current procedure's progress bar and ETA."""
+        percent = (steps_completed / total_steps) * 100
+        self.current_progress['value'] = steps_completed
+        self.current_progress_label.config(text=f"{steps_completed}/{total_steps} Steps ({percent:.2f}%)")
+        self.current_progress_percent_label.config(text=f"{percent:.2f}%")
+        eta_str = time.strftime("%H:%M:%S", time.gmtime(eta)) if eta else "Calculating..."
+        self.current_progress_eta_label.config(text=f"ETA: {eta_str}")
+
+    def banking_procedure(self, run_number, positions, interaction_wait, interface_wait, mouse_controller):
+        """Performs the banking procedure."""
+        self.logger.info(Fore.CYAN + f"Starting Banking Procedure (Run {run_number})...")
+        steps_completed = 0
+        total_steps = 2  # Define the number of steps in banking procedure
+
+        # Step 1: Move to bank position and click
+        self.logger.info(Fore.BLACK + "Moving to bank position.")
+        wait_time = INTERACTION_WAIT(*interaction_wait)
+        mouse_controller.move(*positions['bank_pos'], duration=wait_time)
+        time.sleep(wait_time)
+        mouse_controller.click()
+        time.sleep(interface_wait)
+        steps_completed += 1
+        self.update_current_progress(steps_completed, total_steps, None)
+
+        # Step 2: Move to deposit all position and click
+        self.logger.info(Fore.BLACK + "Moving to deposit all position.")
+        wait_time = INTERACTION_WAIT(*interaction_wait)
+        mouse_controller.move(*positions['deposit_all_pos'], duration=wait_time)
+        time.sleep(wait_time)
+        mouse_controller.click()
+        time.sleep(interface_wait)
+        steps_completed += 1
+        self.update_current_progress(steps_completed, total_steps, None)
+
+        # Step 3: Move to bank item position and shift double-click
+        self.logger.info(Fore.BLACK + "Moving to bank item position.")
+        wait_time = INTERACTION_WAIT(*interaction_wait)
+        mouse_controller.move(*positions['bank_item_pos'], duration=wait_time)
+        time.sleep(wait_time)
+        self.logger.info(Fore.BLACK + "Performing shift double-click on bank item.")
+        keyboard_controller.press(Key.shift)
+        mouse_controller.double_click()
+        keyboard_controller.release(Key.shift)
+        time.sleep(interface_wait)  # Interface wait
+        steps_completed += 1
+        self.update_current_progress(steps_completed, total_steps, None)
+
+        # Step 4: Press ESC to close bank interface
+        self.logger.info(Fore.BLACK + "Pressing ESC to close bank interface.")
+        keyboard_controller.press(Key.esc)
+        keyboard_controller.release(Key.esc)
+        keyboard_controller.press(Key.esc)
+        keyboard_controller.release(Key.esc)
+        time.sleep(interface_wait)
+        steps_completed += 1
+        self.update_current_progress(steps_completed, total_steps, None)
+
+        self.logger.info(Fore.CYAN + f"Completed Banking Procedure (Run {run_number}).")
+        self.update_current_progress(total_steps, total_steps, 0)  # No ETA needed here
+
+    def cooking_procedure(self, run_number, cooking_repeat, tick_time, speculative_mode, cooking_loop_target, positions,
+                          interaction_wait, interface_wait, mouse_controller):
+        """Performs the cooking procedure."""
+        self.logger.info(Fore.GREEN + f"Starting Cooking Procedure (Run {run_number})...")
+        wait_time = INTERACTION_WAIT(*interaction_wait)
+        self.logger.info(Fore.BLACK + "Pressing 'q' to open inventory.")
+        keyboard_controller.press('q')
+        keyboard_controller.release('q')
+        time.sleep(wait_time)
+        self.logger.info(Fore.BLACK + "Pressing 'w' to open cooking interface.")
+        keyboard_controller.press('w')
+        keyboard_controller.release('w')
+
+        # Start pressing '1' continuously
+        stop_event = threading.Event()
+        key_thread = threading.Thread(target=press_key_continuously, args=('1', stop_event))
+        key_thread.start()
+
+        total_start_time = time.time()
+        step_times_list = []
+        eta_iterations = 1
+        recent_iterations = []
+        steps_completed = 0
+        total_steps = cooking_repeat * 2
+
+        try:
+            for i in range(1, cooking_repeat + 1):
+                check_events()
+                loop_start_time = time.time()
+                step_times = {}
+
+                self.logger.info(Fore.LIGHTCYAN_EX + f"Cooking loop iteration {i}/{cooking_repeat}.")
+
+                # Step 1: Move to inven_food_pos and click
+                step_start = time.time()
+                wait_time = INTERACTION_WAIT(*interaction_wait)
+                mouse_controller.move(*positions['inven_food_pos'], duration=wait_time)
+                time.sleep(wait_time)
+                mouse_controller.click()
+                step_times['Step 1'] = time.time() - step_start
+                steps_completed += 1
+                self.update_current_progress(steps_completed, total_steps, None)
+
+                # Step 2: Move to cook_food_pos and click
+                step_start = time.time()
+                wait_time = INTERACTION_WAIT(*interaction_wait)
+                mouse_controller.move(*positions['cook_food_pos'], duration=wait_time)
+                time.sleep(wait_time)
+                mouse_controller.click()
+                step_times['Step 2'] = time.time() - step_start
+                steps_completed += 1
+                self.update_current_progress(steps_completed, total_steps, None)
+
+                # Calculate elapsed time
+                elapsed_time = time.time() - loop_start_time
+
+                if speculative_mode:
+                    # Adjust sleep time to match cooking_loop_target
+                    sleep_time = cooking_loop_target - elapsed_time
+                    if sleep_time > 0:
+                        time.sleep(sleep_time)
+                    else:
+                        self.logger.warning(
+                            Fore.RED + f"Warning: Cooking loop took longer than {cooking_loop_target:.4f} seconds.")
+                else:
+                    # Sleep for tick_time
+                    sleep_time = tick_time - elapsed_time
+                    if sleep_time > 0:
+                        time.sleep(sleep_time)
+                    else:
+                        self.logger.warning(
+                            Fore.RED + f"Warning: Cooking loop took longer than tick_time ({tick_time:.4f} seconds).")
+                        self.logger.info(
+                            Fore.BLUE + f"Tick time: {tick_time:.4f}s, Target - Start Time: {tick_time - elapsed_time:.4f}s")
+
+                # Record total time for this iteration
+                total_loop_time = time.time() - loop_start_time
+                step_times['Total Loop'] = total_loop_time
+                step_times_list.append(step_times)
+
+                # Update recent iterations for ETA
+                recent_iterations.append(total_loop_time)
+                if len(recent_iterations) > eta_iterations:
+                    recent_iterations.pop(0)
+                average_time = sum(recent_iterations) / len(recent_iterations)
+                remaining_iterations = cooking_repeat - i
+                eta = average_time * remaining_iterations
+                eta_str = time.strftime("%H:%M:%S", time.gmtime(eta))
+
+                self.logger.info(Fore.BLUE + f"Iteration {i} times: {step_times}")
+
+                # Update current procedure ETA
+                self.update_current_progress(steps_completed, total_steps, eta_str)
+
+        finally:
+            # Stop the key pressing thread
+            stop_event.set()
+            key_thread.join()
+            total_execution_time = time.time() - total_start_time
+            self.logger.info(Fore.GREEN + f"Completed Cooking Procedure (Run {run_number}).")
+            self.logger.info(Fore.BLUE + f"Total execution time: {total_execution_time:.4f} seconds.")
+            # Print step times
+            for idx, times in enumerate(step_times_list, 1):
+                self.logger.info(Fore.BLUE + f"Iteration {idx} times: {times}")
 
     # Hotkey methods
     def hotkey_start_script(self):

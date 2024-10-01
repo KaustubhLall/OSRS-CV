@@ -29,8 +29,11 @@
             ],
             "return_mouse": true,
             "click_after_return": false,
-            "press_panel_key": false,
-            "return_to_inventory": true
+            "press_panel_key": true,
+            "return_to_inventory": true,
+            "is_dose_macro": false,
+            "call_count": null,
+            "current_position_index": null
         },
         {
             "name": "barrage",
@@ -42,10 +45,36 @@
                     561
                 ]
             ],
+            "return_mouse": true,
+            "click_after_return": true,
+            "press_panel_key": false,
+            "return_to_inventory": true,
+            "is_dose_macro": false,
+            "call_count": null,
+            "current_position_index": null
+        },
+        {
+            "name": "pot up",
+            "hotkey": "b",
+            "panel": "Inventory",
+            "click_positions": [
+                [
+                    2038,
+                    452
+                ],
+                [
+                    2095,
+                    450
+                ]
+            ],
             "return_mouse": false,
             "click_after_return": false,
-            "press_panel_key": false,
-            "return_to_inventory": true
+            "press_panel_key": true,
+            "return_to_inventory": false,
+            "is_dose_macro": true,
+            "dose_count": 2,
+            "call_count": 0,
+            "current_position_index": 0
         }
     ]
 }

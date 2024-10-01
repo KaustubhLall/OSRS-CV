@@ -1,12 +1,14 @@
-import time
-import pyautogui
-import threading
-import tkinter as tk
-from tkinter import ttk
-from tkinter import messagebox
-import json
-from pynput import keyboard
 import ast
+import json
+import threading
+import time
+import tkinter as tk
+from tkinter import messagebox
+from tkinter import ttk
+
+import pyautogui
+from pynput import keyboard
+
 
 # HotkeyManager Class
 class HotkeyManager:
@@ -74,31 +76,20 @@ class HotkeyManager:
                 to_remove.add(hotkey_keys)
         self.pressed_hotkeys -= to_remove
 
+
 # Macro Class
 class Macro:
     def __init__(self, config, app):
         self.name = config["name"]
         self.hotkey = config["hotkey"]
-        self.panel = config["panel"]
-        self.click_positions = config["click_positions"]
-        self.return_mouse = config["return_mouse"]
-        self.return_to_inventory = config.get("return_to_inventory", False)
-        self.click_after_return = config.get("click_after_return", False)
-        self.press_panel_key = config.get("press_panel_key", True)
-        self.is_dose_macro = config.get("is_dose_macro", False)  # Indicates if it's a dose-counting macro
+        self.actions = config["actions"]  # List of actions
+        self.is_dose_macro = config.get("is_dose_macro", False)
+        self.dose_count = config.get("dose_count", 4) if self.is_dose_macro else None
 
-        # Initialize call_count and current_position_index properly
-        self.call_count = config.get("call_count")
-        if self.call_count is None or not isinstance(self.call_count, int):
-            self.call_count = 0
+        self.call_count = config.get("call_count", 0)
+        self.current_position_index = config.get("current_position_index", 0)
 
-        self.current_position_index = config.get("current_position_index")
-        if self.current_position_index is None or not isinstance(self.current_position_index, int):
-            self.current_position_index = 0
-
-        self.dose_count = config.get("dose_count", 4) if self.is_dose_macro else None  # Number of doses before cycling
-
-        self.app = app  # Reference to the main application for logging and config
+        self.app = app
 
     def execute(self):
         threading.Thread(target=self.run_macro).start()
@@ -110,81 +101,104 @@ class Macro:
         start_time = time.time()
         log = []
 
-        # Increment call count only for dose-counting macros
         if self.is_dose_macro:
             self.call_count += 1
             self.app.update_macro_call_count(self)
-            self.app.config_save_required = True  # Flag to save config later
+            self.app.config_save_required = True
 
-            # Determine if it's time to cycle click position
-            if self.call_count % self.dose_count == 1 and self.call_count != 1:
-                self.current_position_index = (self.current_position_index + 1) % len(self.click_positions)
-                log.append(f"Cycled to next click position: {self.click_positions[self.current_position_index]}")
+            if self.call_count % self.dose_count == 0:
+                self.current_position_index = (self.current_position_index + 1) % self.get_total_positions()
+                log.append(f"Cycled to next position index: {self.current_position_index}")
 
-            current_click_position = self.click_positions[self.current_position_index]
-        else:
-            current_click_position = self.click_positions
-
-        # Remember current mouse position
         original_position = pyautogui.position()
         log.append(f"Original mouse position: {original_position}")
 
-        # Optional: Press panel key
-        if self.press_panel_key:
-            pyautogui.press(self.app.panel_key)
-            log.append(f"Pressed panel key '{self.app.panel_key}'")
-            time.sleep(self.app.interface_switch_time)
+        # Now iterate over actions and execute them
+        for action in self.actions:
+            action_type = action.get('type')
 
-        # Get specific panel key
-        specific_panel_keys = {
-            'Inventory': self.app.inventory_key,
-            'Prayer': self.app.prayer_key,
-            'Spells': self.app.spells_key
-        }
-        specific_panel_key = specific_panel_keys.get(self.panel)
+            if action_type == 'press_panel_key':
+                key = action.get('key', self.app.panel_key)
+                pyautogui.press(key)
+                log.append(f"Pressed panel key '{key}'")
+                time.sleep(self.app.interface_switch_time)
 
-        # Press specific panel key
-        pyautogui.press(specific_panel_key)
-        log.append(f"Pressed specific panel key '{specific_panel_key}' for panel '{self.panel}'")
-        time.sleep(self.app.action_registration_time())
-
-        # Click configured positions
-        if self.is_dose_macro:
-            pos = current_click_position
-            pyautogui.moveTo(pos[0], pos[1])
-            pyautogui.click()
-            log.append(f"Clicked at position {pos}")
-            time.sleep(self.app.action_registration_time())
-        else:
-            for pos in current_click_position:
-                pyautogui.moveTo(pos[0], pos[1])
-                pyautogui.click()
-                log.append(f"Clicked at position {pos}")
+            elif action_type == 'press_specific_panel_key':
+                panel = action.get('panel')
+                specific_panel_keys = {
+                    'Inventory': self.app.inventory_key,
+                    'Prayer': self.app.prayer_key,
+                    'Spells': self.app.spells_key
+                }
+                specific_panel_key = specific_panel_keys.get(panel)
+                pyautogui.press(specific_panel_key)
+                log.append(f"Pressed specific panel key '{specific_panel_key}' for panel '{panel}'")
                 time.sleep(self.app.action_registration_time())
 
-        # Return mouse to original position
-        if self.return_mouse:
-            pyautogui.moveTo(original_position)
-            log.append("Mouse returned to original position")
-            # Optional click after returning mouse
-            if self.click_after_return:
-                pyautogui.click()
-                log.append("Clicked after returning to original position")
-            time.sleep(self.app.action_registration_time())
+            elif action_type == 'click':
+                positions = action.get('positions', [])
+                use_saved_target = action.get('use_saved_target', False)
 
-        # Optional: Return to Inventory
-        if self.return_to_inventory:
-            pyautogui.press(self.app.inventory_key)
-            log.append(f"Pressed inventory key '{self.app.inventory_key}' to return to Inventory")
-            time.sleep(self.app.interface_switch_time)
+                if use_saved_target:
+                    pos = original_position
+                else:
+                    if self.is_dose_macro:
+                        pos_index = self.current_position_index % len(positions)
+                        pos = positions[pos_index]
+                    else:
+                        pos = positions
+
+                if isinstance(pos[0], (list, tuple)):
+                    # List of positions
+                    for p in pos:
+                        pyautogui.moveTo(p[0], p[1])
+                        pyautogui.click()
+                        log.append(f"Clicked at position {p}")
+                        time.sleep(self.app.action_registration_time())
+                else:
+                    # Single position
+                    pyautogui.moveTo(pos[0], pos[1])
+                    pyautogui.click()
+                    log.append(f"Clicked at position {pos}")
+                    time.sleep(self.app.action_registration_time())
+
+            elif action_type == 'return_mouse':
+                pyautogui.moveTo(original_position)
+                log.append("Mouse returned to original position")
+                click_after_return = action.get('click_after_return', False)
+                if click_after_return:
+                    pyautogui.click()
+                    log.append("Clicked after returning to original position")
+                time.sleep(self.app.action_registration_time())
+
+            elif action_type == 'return_to_inventory':
+                pyautogui.press(self.app.inventory_key)
+                log.append(f"Pressed inventory key '{self.app.inventory_key}' to return to Inventory")
+                time.sleep(self.app.interface_switch_time)
+
+            elif action_type == 'wait':
+                duration = action.get('duration', self.app.action_registration_time())
+                time.sleep(duration)
+                log.append(f"Waited for {duration} seconds")
+
+            else:
+                log.append(f"Unknown action type: {action_type}")
 
         end_time = time.time()
         total_time = end_time - start_time
         log.append(f"Macro '{self.name}' executed in {total_time:.3f} seconds")
 
-        # Log to GUI using app.after to ensure thread safety
         log_message = "\n".join(log)
         self.app.after(0, self.app.log, log_message)
+
+    def get_total_positions(self):
+        # Returns the total number of positions for dose counting
+        total_positions = 0
+        for action in self.actions:
+            if action.get('type') == 'click':
+                positions = action.get('positions', [])
+                total_positions = max(total_positions, len(positions))
+        return total_positions if total_positions > 0 else 1
 
     def reset_call_count(self):
         self.call_count = 0
@@ -193,6 +207,7 @@ class Macro:
             self.app.update_macro_call_count(self)
         self.app.log(f"Call count for macro '{self.name}' has been reset.")
 
+
 # Functions to load macros
 def load_macros(app):
     macros = []
@@ -200,6 +215,7 @@ def load_macros(app):
         macro = Macro(macro_config, app)
         macros.append(macro)
     return macros
+
 
 # MacroApp Class
 class MacroApp(tk.Tk):
@@ -315,17 +331,16 @@ class MacroApp(tk.Tk):
 
     def create_macros_tab(self):
         # Treeview to display macros
-        self.macro_list = ttk.Treeview(self.macro_frame, columns=('Name', 'Hotkey', 'Panel', 'Doses'), show='headings')
+        self.macro_list = ttk.Treeview(self.macro_frame, columns=('Name', 'Hotkey', 'Doses'), show='headings')
         self.macro_list.heading('Name', text='Name')
         self.macro_list.heading('Hotkey', text='Hotkey')
-        self.macro_list.heading('Panel', text='Panel')
         self.macro_list.heading('Doses', text='Doses')  # Indicates dose-counting macros
         self.macro_list.pack(expand=True, fill='both')
 
         # Populate the treeview with existing macros
         for macro in self.config['macros']:
             doses = macro['dose_count'] if macro.get('is_dose_macro', False) else "N/A"
-            self.macro_list.insert('', 'end', values=(macro['name'], macro['hotkey'], macro['panel'], doses))
+            self.macro_list.insert('', 'end', values=(macro['name'], macro['hotkey'], doses))
 
         # Buttons
         btn_frame = ttk.Frame(self.macro_frame)
@@ -495,7 +510,7 @@ class MacroApp(tk.Tk):
             values = self.macro_list.item(item, 'values')
             if values[0] == macro.name:
                 doses = macro.dose_count if macro.is_dose_macro else "N/A"
-                self.macro_list.item(item, values=(macro.name, macro.hotkey, macro.panel, doses))
+                self.macro_list.item(item, values=(macro.name, macro.hotkey, doses))
                 break
 
     def reset_macro_call_count(self):
@@ -517,6 +532,7 @@ class MacroApp(tk.Tk):
         else:
             messagebox.showinfo("Not Applicable", "Call count reset is only applicable to dose-counting macros.")
 
+
 # MacroEditor Class
 class MacroEditor(tk.Toplevel):
     def __init__(self, parent, macro_config):
@@ -524,12 +540,12 @@ class MacroEditor(tk.Toplevel):
         self.parent = parent
         self.macro_config = macro_config
         self.title("Macro Editor")
-        self.geometry("500x600")
+        self.geometry("600x700")
         self.create_widgets()
 
     def create_widgets(self):
         instruction_label = ttk.Label(self,
-                                      text="Fill in the details for the macro. Use 'Add Position' to set click positions.")
+                                      text="Fill in the details for the macro. Use 'Add Action' to set up the action sequence.")
         instruction_label.grid(row=0, column=0, columnspan=3, padx=10, pady=10)
 
         # Name
@@ -542,67 +558,47 @@ class MacroEditor(tk.Toplevel):
         self.hotkey_entry = ttk.Entry(self, width=30)
         self.hotkey_entry.grid(row=2, column=1, columnspan=2, padx=10, pady=5, sticky='w')
 
-        # Select Panel
-        ttk.Label(self, text="Select Panel:").grid(row=3, column=0, padx=10, pady=5, sticky='e')
-        self.panel_options = ["Inventory", "Prayer", "Spells"]
-        self.selected_panel = tk.StringVar()
-        self.selected_panel.set(self.panel_options[0])
-        self.panel_menu = ttk.OptionMenu(self, self.selected_panel, self.panel_options[0], *self.panel_options)
-        self.panel_menu.grid(row=3, column=1, columnspan=2, padx=10, pady=5, sticky='w')
-
-        # Press Panel Key Checkbox
-        self.press_panel_key_var = tk.BooleanVar(value=True)
-        self.press_panel_key_check = ttk.Checkbutton(self, text="Press Panel Key", variable=self.press_panel_key_var)
-        self.press_panel_key_check.grid(row=4, column=0, columnspan=3, padx=10, pady=5, sticky='w')
-
-        # Return Mouse Checkbox
-        self.return_mouse_var = tk.BooleanVar(value=True)
-        self.return_mouse_check = ttk.Checkbutton(self, text="Return Mouse to Original Position",
-                                                  variable=self.return_mouse_var)
-        self.return_mouse_check.grid(row=5, column=0, columnspan=3, padx=10, pady=5, sticky='w')
-
-        # Click After Return Checkbox
-        self.click_after_return_var = tk.BooleanVar(value=False)
-        self.click_after_return_check = ttk.Checkbutton(self, text="Click After Returning Mouse",
-                                                        variable=self.click_after_return_var)
-        self.click_after_return_check.grid(row=6, column=0, columnspan=3, padx=10, pady=5, sticky='w')
-
-        # Return to Inventory Checkbox
-        self.return_to_inventory_var = tk.BooleanVar(value=False)
-        self.return_to_inventory_check = ttk.Checkbutton(self, text="Return to Inventory",
-                                                         variable=self.return_to_inventory_var)
-        self.return_to_inventory_check.grid(row=7, column=0, columnspan=3, padx=10, pady=5, sticky='w')
-
         # Dose-Counting Macro Checkbox
         self.is_dose_macro_var = tk.BooleanVar(value=False)
         self.is_dose_macro_check = ttk.Checkbutton(self, text="Enable Dose-Counting", variable=self.is_dose_macro_var,
                                                    command=self.toggle_dose_count_entry)
-        self.is_dose_macro_check.grid(row=8, column=0, columnspan=3, padx=10, pady=5, sticky='w')
+        self.is_dose_macro_check.grid(row=3, column=0, columnspan=3, padx=10, pady=5, sticky='w')
 
         # Number of Doses Entry (only visible if dose-counting is enabled)
-        ttk.Label(self, text="Number of Doses:").grid(row=9, column=0, padx=10, pady=5, sticky='e')
+        ttk.Label(self, text="Number of Doses:").grid(row=4, column=0, padx=10, pady=5, sticky='e')
         self.dose_count_entry = ttk.Entry(self, width=10)
-        self.dose_count_entry.grid(row=9, column=1, padx=10, pady=5, sticky='w')
+        self.dose_count_entry.grid(row=4, column=1, padx=10, pady=5, sticky='w')
         self.dose_count_entry.config(state='disabled')  # Initially disabled
 
-        # Click Positions List
-        ttk.Label(self, text="Click Positions:").grid(row=10, column=0, padx=10, pady=5, sticky='ne')
-        self.click_positions_listbox = tk.Listbox(self, height=10, width=30)
-        self.click_positions_listbox.grid(row=10, column=1, padx=10, pady=5, sticky='w')
+        # Actions List
+        ttk.Label(self, text="Actions:").grid(row=5, column=0, padx=10, pady=5, sticky='ne')
+        self.actions_listbox = tk.Listbox(self, height=15, width=50)
+        self.actions_listbox.grid(row=5, column=1, padx=10, pady=5, sticky='w')
 
-        # Buttons for click positions
+        # Buttons for actions
         btn_frame = ttk.Frame(self)
-        btn_frame.grid(row=10, column=2, padx=10, pady=5, sticky='n')
+        btn_frame.grid(row=5, column=2, padx=10, pady=5, sticky='n')
 
-        add_pos_btn = ttk.Button(btn_frame, text="Add Position", command=self.add_click_position)
-        add_pos_btn.pack(side='top', padx=5, pady=2)
+        add_action_btn = ttk.Button(btn_frame, text="Add Action", command=self.add_action)
+        add_action_btn.pack(side='top', padx=5, pady=2)
 
-        del_pos_btn = ttk.Button(btn_frame, text="Delete Position", command=self.delete_click_position)
-        del_pos_btn.pack(side='top', padx=5, pady=2)
+        edit_action_btn = ttk.Button(btn_frame, text="Edit Action", command=self.edit_action)
+        edit_action_btn.pack(side='top', padx=5, pady=2)
+
+        del_action_btn = ttk.Button(btn_frame, text="Delete Action", command=self.delete_action)
+        del_action_btn.pack(side='top', padx=5, pady=2)
+
+        move_up_btn = ttk.Button(btn_frame, text="Move Up", command=self.move_action_up)
+        move_up_btn.pack(side='top', padx=5, pady=2)
+
+        move_down_btn = ttk.Button(btn_frame, text="Move Down", command=self.move_action_down)
+        move_down_btn.pack(side='top', padx=5, pady=2)
 
         # Save Button
         save_btn = ttk.Button(self, text="Save Macro", command=self.save_macro)
-        save_btn.grid(row=11, column=0, columnspan=3, pady=20)
+        save_btn.grid(row=6, column=0, columnspan=3, pady=20)
+
+        self.actions_list = []  # List to store actions
 
         # Load macro data if editing
         if self.macro_config:
@@ -616,54 +612,89 @@ class MacroEditor(tk.Toplevel):
             self.dose_count_entry.delete(0, tk.END)
             self.dose_count_entry.config(state='disabled')
 
+    def get_action_description(self, action):
+        action_type = action.get('type')
+        if action_type == 'press_panel_key':
+            return f"Press Panel Key '{action.get('key')}'"
+        elif action_type == 'press_specific_panel_key':
+            return f"Press Specific Panel Key '{action.get('panel')}'"
+        elif action_type == 'click':
+            if action.get('use_saved_target', False):
+                return "Click at Saved Target Position"
+            else:
+                positions = action.get('positions', [])
+                return f"Click at Positions {positions}"
+        elif action_type == 'return_mouse':
+            return "Return Mouse to Original Position" + (
+                " and Click" if action.get('click_after_return', False) else "")
+        elif action_type == 'return_to_inventory':
+            return "Return to Inventory"
+        elif action_type == 'wait':
+            return f"Wait for {action.get('duration')} seconds"
+        else:
+            return "Unknown Action"
+
     def load_macro_data(self):
         self.name_entry.insert(0, self.macro_config['name'])
         self.hotkey_entry.insert(0, self.macro_config['hotkey'])
-        self.selected_panel.set(self.macro_config['panel'])
-        self.return_mouse_var.set(self.macro_config['return_mouse'])
-        self.click_after_return_var.set(self.macro_config.get('click_after_return', False))
-        self.press_panel_key_var.set(self.macro_config.get('press_panel_key', True))
-        self.return_to_inventory_var.set(self.macro_config.get('return_to_inventory', False))
         if self.macro_config.get('is_dose_macro', False):
             self.is_dose_macro_var.set(True)
             self.dose_count_entry.config(state='normal')
             self.dose_count_entry.insert(0, str(self.macro_config.get('dose_count', 4)))
-        for pos in self.macro_config['click_positions']:
-            self.click_positions_listbox.insert('end', str(pos))
+        self.actions_list = self.macro_config.get('actions', [])
+        for action in self.actions_list:
+            self.actions_listbox.insert('end', self.get_action_description(action))
 
-    def add_click_position(self):
-        self.info_label = ttk.Label(self, text="Move the mouse to the desired position and press 's' to set.")
-        self.info_label.grid(row=12, column=0, columnspan=3, padx=10, pady=5)
+    def add_action(self):
+        ActionEditor(self, None)
 
-        self.wait_for_position()
-
-    def wait_for_position(self):
-        def on_press(key):
-            try:
-                if key.char.lower() == 's':
-                    x, y = pyautogui.position()
-                    self.click_positions_listbox.insert('end', str((x, y)))
-                    listener.stop()
-                    self.info_label.destroy()
-            except AttributeError:
-                pass
-
-        listener = keyboard.Listener(on_press=on_press)
-        listener.start()
-
-    def delete_click_position(self):
-        selected = self.click_positions_listbox.curselection()
+    def edit_action(self):
+        selected = self.actions_listbox.curselection()
         if selected:
-            self.click_positions_listbox.delete(selected)
+            index = selected[0]
+            action = self.actions_list[index]
+            ActionEditor(self, action, index)
+        else:
+            messagebox.showwarning("No Selection", "Please select an action to edit.")
+
+    def delete_action(self):
+        selected = self.actions_listbox.curselection()
+        if selected:
+            index = selected[0]
+            self.actions_list.pop(index)
+            self.actions_listbox.delete(index)
+        else:
+            messagebox.showwarning("No Selection", "Please select an action to delete.")
+
+    def move_action_up(self):
+        selected = self.actions_listbox.curselection()
+        if selected and selected[0] > 0:
+            index = selected[0]
+            self.actions_list[index - 1], self.actions_list[index] = self.actions_list[index], self.actions_list[
+                index - 1]
+            action_text = self.actions_listbox.get(index)
+            self.actions_listbox.delete(index)
+            self.actions_listbox.insert(index - 1, action_text)
+            self.actions_listbox.selection_set(index - 1)
+        else:
+            messagebox.showwarning("Cannot Move", "Cannot move the selected action up.")
+
+    def move_action_down(self):
+        selected = self.actions_listbox.curselection()
+        if selected and selected[0] < len(self.actions_list) - 1:
+            index = selected[0]
+            self.actions_list[index + 1], self.actions_list[index] = self.actions_list[index], self.actions_list[
+                index + 1]
+            action_text = self.actions_listbox.get(index)
+            self.actions_listbox.delete(index)
+            self.actions_listbox.insert(index + 1, action_text)
+            self.actions_listbox.selection_set(index + 1)
+        else:
+            messagebox.showwarning("Cannot Move", "Cannot move the selected action down.")
 
     def save_macro(self):
         name = self.name_entry.get().strip()
         hotkey = self.hotkey_entry.get().strip()
-        selected_panel = self.selected_panel.get()
-        return_mouse = self.return_mouse_var.get()
-        click_after_return = self.click_after_return_var.get()
-        press_panel_key = self.press_panel_key_var.get()
-        return_to_inventory = self.return_to_inventory_var.get()
         is_dose_macro = self.is_dose_macro_var.get()
         dose_count = None
 
@@ -674,13 +705,7 @@ class MacroEditor(tk.Toplevel):
                 return
             dose_count = int(dose_count_str)
 
-        try:
-            click_positions = [ast.literal_eval(pos) for pos in self.click_positions_listbox.get(0, 'end')]
-        except (ValueError, SyntaxError):
-            messagebox.showerror("Invalid Positions", "Click positions must be in the format (x, y).")
-            return
-
-        if not name or not hotkey or not selected_panel:
+        if not name or not hotkey:
             messagebox.showerror("Missing Information", "Please fill in all the required fields.")
             return
 
@@ -690,25 +715,22 @@ class MacroEditor(tk.Toplevel):
             # If editing, remove the current macro's name from the list to allow renaming to itself
             existing_names.remove(self.macro_config['name'])
         if name in existing_names:
-            messagebox.showerror("Duplicate Name", "A macro with this name already exists. Please choose a different name.")
+            messagebox.showerror("Duplicate Name",
+                                 "A macro with this name already exists. Please choose a different name.")
             return
 
         new_macro = {
             "name": name,
             "hotkey": hotkey,
-            "panel": selected_panel,
-            "click_positions": click_positions,
-            "return_mouse": return_mouse,
-            "click_after_return": click_after_return,
-            "press_panel_key": press_panel_key,
-            "return_to_inventory": return_to_inventory,
+            "actions": self.actions_list,
             "is_dose_macro": is_dose_macro
         }
 
         if is_dose_macro:
             new_macro["dose_count"] = dose_count
             new_macro["call_count"] = self.macro_config.get("call_count", 0) if self.macro_config else 0
-            new_macro["current_position_index"] = self.macro_config.get("current_position_index", 0) if self.macro_config else 0
+            new_macro["current_position_index"] = self.macro_config.get("current_position_index",
+                                                                        0) if self.macro_config else 0
         else:
             # Ensure call_count and current_position_index are set to 0 for consistency
             new_macro["call_count"] = 0
@@ -727,10 +749,199 @@ class MacroEditor(tk.Toplevel):
         self.parent.macro_list.delete(*self.parent.macro_list.get_children())
         for macro in self.parent.config['macros']:
             doses = macro['dose_count'] if macro.get('is_dose_macro', False) else "N/A"
-            self.parent.macro_list.insert('', 'end', values=(macro['name'], macro['hotkey'], macro['panel'], doses))
+            self.parent.macro_list.insert('', 'end', values=(macro['name'], macro['hotkey'], doses))
         self.parent.register_hotkeys()
         self.parent.log(f"Macro '{name}' has been saved.")
         self.destroy()
+
+
+# ActionEditor Class
+class ActionEditor(tk.Toplevel):
+    def __init__(self, parent, action=None, index=None):
+        super().__init__(parent)
+        self.parent = parent
+        self.action = action
+        self.index = index
+        self.title("Action Editor")
+        self.geometry("500x400")
+        self.create_widgets()
+
+    def create_widgets(self):
+        # Action Type
+        ttk.Label(self, text="Action Type:").grid(row=0, column=0, padx=10, pady=5, sticky='e')
+        self.action_types = ["Press Panel Key", "Press Specific Panel Key", "Click", "Return Mouse",
+                             "Return to Inventory", "Wait"]
+        self.selected_action_type = tk.StringVar()
+        self.selected_action_type.set(self.action_types[0])
+        self.action_type_menu = ttk.OptionMenu(self, self.selected_action_type, self.action_types[0],
+                                               *self.action_types, command=self.update_action_fields)
+        self.action_type_menu.grid(row=0, column=1, padx=10, pady=5, sticky='w')
+
+        # Parameters Frame
+        self.params_frame = ttk.Frame(self)
+        self.params_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=5)
+
+        # Save Button
+        save_btn = ttk.Button(self, text="Save Action", command=self.save_action)
+        save_btn.grid(row=2, column=0, columnspan=2, pady=20)
+
+        if self.action:
+            # Load action data
+            self.selected_action_type.set(self.action.get('type').replace('_', ' ').title())
+            self.update_action_fields(None)
+            # Populate fields based on action
+            self.load_action_data()
+
+    def update_action_fields(self, *args):
+        # Clear the params_frame
+        for widget in self.params_frame.winfo_children():
+            widget.destroy()
+
+        action_type = self.selected_action_type.get()
+        if action_type == "Press Panel Key":
+            ttk.Label(self.params_frame, text="Key:").grid(row=0, column=0, padx=5, pady=5)
+            self.key_entry = ttk.Entry(self.params_frame)
+            self.key_entry.grid(row=0, column=1, padx=5, pady=5)
+        elif action_type == "Press Specific Panel Key":
+            ttk.Label(self.params_frame, text="Panel:").grid(row=0, column=0, padx=5, pady=5)
+            self.panel_options = ["Inventory", "Prayer", "Spells"]
+            self.selected_panel = tk.StringVar()
+            self.selected_panel.set(self.panel_options[0])
+            self.panel_menu = ttk.OptionMenu(self.params_frame, self.selected_panel, self.panel_options[0],
+                                             *self.panel_options)
+            self.panel_menu.grid(row=0, column=1, padx=5, pady=5)
+        elif action_type == "Click":
+            self.use_saved_target_var = tk.BooleanVar()
+            self.use_saved_target_check = ttk.Checkbutton(self.params_frame, text="Use Saved Target Position",
+                                                          variable=self.use_saved_target_var)
+            self.use_saved_target_check.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky='w')
+
+            ttk.Label(self.params_frame, text="Positions:").grid(row=1, column=0, padx=5, pady=5, sticky='ne')
+            self.positions_listbox = tk.Listbox(self.params_frame, height=5, width=30)
+            self.positions_listbox.grid(row=1, column=1, padx=5, pady=5, sticky='w')
+
+            btn_frame = ttk.Frame(self.params_frame)
+            btn_frame.grid(row=1, column=2, padx=5, pady=5, sticky='n')
+
+            add_pos_btn = ttk.Button(btn_frame, text="Add Position", command=self.add_click_position)
+            add_pos_btn.pack(side='top', padx=5, pady=2)
+
+            del_pos_btn = ttk.Button(btn_frame, text="Delete Position", command=self.delete_click_position)
+            del_pos_btn.pack(side='top', padx=5, pady=2)
+        elif action_type == "Return Mouse":
+            self.click_after_return_var = tk.BooleanVar()
+            self.click_after_return_check = ttk.Checkbutton(self.params_frame, text="Click After Return",
+                                                            variable=self.click_after_return_var)
+            self.click_after_return_check.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky='w')
+        elif action_type == "Wait":
+            ttk.Label(self.params_frame, text="Duration (s):").grid(row=0, column=0, padx=5, pady=5)
+            self.duration_entry = ttk.Entry(self.params_frame)
+            self.duration_entry.grid(row=0, column=1, padx=5, pady=5)
+        # No additional parameters for "Return to Inventory"
+
+    def load_action_data(self):
+        action_type = self.action.get('type')
+        if action_type == 'press_panel_key':
+            self.key_entry.insert(0, self.action.get('key', ''))
+        elif action_type == 'press_specific_panel_key':
+            self.selected_panel.set(self.action.get('panel', 'Inventory'))
+        elif action_type == 'click':
+            self.use_saved_target_var.set(self.action.get('use_saved_target', False))
+            positions = self.action.get('positions', [])
+            for pos in positions:
+                self.positions_listbox.insert('end', str(pos))
+        elif action_type == 'return_mouse':
+            self.click_after_return_var.set(self.action.get('click_after_return', False))
+        elif action_type == 'wait':
+            self.duration_entry.insert(0, str(self.action.get('duration', 0)))
+
+    def add_click_position(self):
+        self.info_label = ttk.Label(self, text="Move the mouse to the desired position and press 's' to set.")
+        self.info_label.grid(row=3, column=0, columnspan=2, padx=10, pady=5)
+
+        self.wait_for_position()
+
+    def wait_for_position(self):
+        def on_press(key):
+            try:
+                if key.char.lower() == 's':
+                    x, y = pyautogui.position()
+                    self.positions_listbox.insert('end', str((x, y)))
+                    listener.stop()
+                    self.info_label.destroy()
+                elif key.char.lower() == 'c':
+                    listener.stop()
+                    self.info_label.destroy()
+            except AttributeError:
+                pass
+
+        listener = keyboard.Listener(on_press=on_press)
+        listener.start()
+
+    def delete_click_position(self):
+        selected = self.positions_listbox.curselection()
+        if selected:
+            self.positions_listbox.delete(selected)
+
+    def save_action(self):
+        action_type = self.selected_action_type.get()
+        action = {}
+        if action_type == "Press Panel Key":
+            action = {
+                'type': 'press_panel_key',
+                'key': self.key_entry.get()
+            }
+        elif action_type == "Press Specific Panel Key":
+            action = {
+                'type': 'press_specific_panel_key',
+                'panel': self.selected_panel.get()
+            }
+        elif action_type == "Click":
+            use_saved_target = self.use_saved_target_var.get()
+            positions = []
+            if not use_saved_target:
+                try:
+                    positions = [ast.literal_eval(pos) for pos in self.positions_listbox.get(0, 'end')]
+                except (ValueError, SyntaxError):
+                    messagebox.showerror("Invalid Positions", "Click positions must be in the format (x, y).")
+                    return
+            action = {
+                'type': 'click',
+                'use_saved_target': use_saved_target,
+                'positions': positions
+            }
+        elif action_type == "Return Mouse":
+            action = {
+                'type': 'return_mouse',
+                'click_after_return': self.click_after_return_var.get()
+            }
+        elif action_type == "Return to Inventory":
+            action = {
+                'type': 'return_to_inventory'
+            }
+        elif action_type == "Wait":
+            try:
+                duration = float(self.duration_entry.get())
+            except ValueError:
+                messagebox.showerror("Invalid Input", "Duration must be a number.")
+                return
+            action = {
+                'type': 'wait',
+                'duration': duration
+            }
+
+        # Save the action to parent
+        if self.action is not None:
+            # Editing existing action
+            self.parent.actions_list[self.index] = action
+            self.parent.actions_listbox.delete(self.index)
+            self.parent.actions_listbox.insert(self.index, self.parent.get_action_description(action))
+        else:
+            # Adding new action
+            self.parent.actions_list.append(action)
+            self.parent.actions_listbox.insert('end', self.parent.get_action_description(action))
+        self.destroy()
+
 
 # Main Execution
 if __name__ == "__main__":

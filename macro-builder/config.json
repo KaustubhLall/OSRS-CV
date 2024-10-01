@@ -1,0 +1,51 @@
+{
+    "interface_switch_time": 0.02,
+    "action_registration_time_min": 0.01,
+    "action_registration_time_max": 0.01,
+    "panel_key": "q",
+    "specific_panel_keys": {
+        "Inventory": "w",
+        "Prayer": "e",
+        "Spells": "r"
+    },
+    "macros": [
+        {
+            "name": "pray range",
+            "hotkey": "z",
+            "panel": "Prayer",
+            "click_positions": [
+                [
+                    2029,
+                    585
+                ],
+                [
+                    2077,
+                    677
+                ],
+                [
+                    2029,
+                    678
+                ]
+            ],
+            "return_mouse": true,
+            "click_after_return": false,
+            "press_panel_key": false,
+            "return_to_inventory": true
+        },
+        {
+            "name": "barrage",
+            "hotkey": "c",
+            "panel": "Spells",
+            "click_positions": [
+                [
+                    2035,
+                    561
+                ]
+            ],
+            "return_mouse": false,
+            "click_after_return": false,
+            "press_panel_key": false,
+            "return_to_inventory": true
+        }
+    ]
+}

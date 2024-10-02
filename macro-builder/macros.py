@@ -10,7 +10,6 @@ import pyautogui
 from pynput import keyboard
 
 
-# HotkeyManager Class
 class HotkeyManager:
     def __init__(self, app):
         self.app = app
@@ -116,11 +115,14 @@ class Macro:
         # Now iterate over actions and execute them
         for action in self.actions:
             action_type = action.get('type')
+            action_start_time = time.time()
 
             if action_type == 'press_panel_key':
                 key = action.get('key', self.app.panel_key)
                 pyautogui.press(key)
-                log.append(f"Pressed panel key '{key}'")
+                action_end_time = time.time()
+                action_time = action_end_time - action_start_time
+                log.append(f"Pressed panel key '{key}' (took {action_time:.6f} seconds)")
                 # time.sleep(self.app.interface_switch_time)
 
             elif action_type == 'press_specific_panel_key':
@@ -132,7 +134,10 @@ class Macro:
                 }
                 specific_panel_key = specific_panel_keys.get(panel)
                 pyautogui.press(specific_panel_key)
-                log.append(f"Pressed specific panel key '{specific_panel_key}' for panel '{panel}'")
+                action_end_time = time.time()
+                action_time = action_end_time - action_start_time
+                log.append(
+                    f"Pressed specific panel key '{specific_panel_key}' for panel '{panel}' (took {action_time:.6f} seconds)")
                 # time.sleep(self.app.action_registration_time())
 
             elif action_type == 'click':
@@ -153,33 +158,48 @@ class Macro:
                     for p in pos:
                         pyautogui.moveTo(p[0], p[1], duration=self.app.mouse_move_duration)
                         pyautogui.click()
-                        log.append(f"Clicked at position {p}")
+                        # Log time for each click
+                        action_end_time = time.time()
+                        action_time = action_end_time - action_start_time
+                        log.append(f"Clicked at position {p} (took {action_time:.6f} seconds)")
+                        action_start_time = time.time()
                         # time.sleep(self.app.action_registration_time())
                 else:
                     # Single position
                     pyautogui.moveTo(pos[0], pos[1], duration=self.app.mouse_move_duration)
                     pyautogui.click()
-                    log.append(f"Clicked at position {pos}")
+                    action_end_time = time.time()
+                    action_time = action_end_time - action_start_time
+                    log.append(f"Clicked at position {pos} (took {action_time:.6f} seconds)")
                     # time.sleep(self.app.action_registration_time())
 
             elif action_type == 'return_mouse':
                 pyautogui.moveTo(original_position[0], original_position[1], duration=self.app.mouse_move_duration)
-                log.append("Mouse returned to original position")
+                action_end_time = time.time()
+                action_time = action_end_time - action_start_time
+                log.append(f"Mouse returned to original position (took {action_time:.6f} seconds)")
                 click_after_return = action.get('click_after_return', False)
                 if click_after_return:
                     pyautogui.click()
-                    log.append("Clicked after returning to original position")
+                    action_end_time = time.time()
+                    action_time = action_end_time - action_start_time
+                    log.append(f"Clicked after returning to original position (took {action_time:.6f} seconds)")
                 # time.sleep(self.app.action_registration_time())
 
             elif action_type == 'return_to_inventory':
                 pyautogui.press(self.app.inventory_key)
-                log.append(f"Pressed inventory key '{self.app.inventory_key}' to return to Inventory")
+                action_end_time = time.time()
+                action_time = action_end_time - action_start_time
+                log.append(
+                    f"Pressed inventory key '{self.app.inventory_key}' to return to Inventory (took {action_time:.6f} seconds)")
                 # time.sleep(self.app.interface_switch_time)
 
             elif action_type == 'wait':
                 duration = action.get('duration', self.app.action_registration_time())
                 time.sleep(duration)
-                log.append(f"Waited for {duration} seconds")
+                action_end_time = time.time()
+                action_time = action_end_time - action_start_time
+                log.append(f"Waited for {duration} seconds (took {action_time:.6f} seconds)")
 
             else:
                 log.append(f"Unknown action type: {action_type}")
@@ -244,6 +264,9 @@ class MacroApp(tk.Tk):
 
         # Initialize macros
         self.initialize_macros()
+
+        # Set pyautogui pause to 0 to eliminate default delay
+        pyautogui.PAUSE = 0.025
 
         self.create_widgets()
         self.update_mouse_position()

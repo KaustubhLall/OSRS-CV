@@ -1,7 +1,7 @@
 {
-    "interface_switch_time": 0.01,
-    "action_registration_time_min": 0.01,
-    "action_registration_time_max": 0.01,
+    "interface_switch_time": 0.1,
+    "action_registration_time_min": 0.1,
+    "action_registration_time_max": 0.15,
     "panel_key": "q",
     "specific_panel_keys": {
         "Inventory": "w",
@@ -226,7 +226,7 @@
                 },
                 {
                     "type": "return_mouse",
-                    "click_after_return": false
+                    "click_after_return": true
                 },
                 {
                     "type": "return_to_inventory"
@@ -566,7 +566,7 @@
         },
         {
             "name": "MELEE SPEC",
-            "hotkey": "a",
+            "hotkey": "4",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
@@ -601,8 +601,8 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1911,
-                            758
+                            1909,
+                            835
                         ]
                     ]
                 },
@@ -626,5 +626,5 @@
             "current_position_index": 0
         }
     ],
-    "mouse_move_duration": 0.0
+    "mouse_move_duration": 0.1
 }

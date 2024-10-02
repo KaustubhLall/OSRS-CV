@@ -116,33 +116,42 @@ class Macro:
         for action in self.actions:
             action_type = action.get('type')
             action_start_time = time.time()
+            annotation = action.get('annotation', '')
 
             if action_type == 'press_panel_key':
                 key = action.get('key', self.app.panel_key)
                 pyautogui.press(key)
                 action_end_time = time.time()
                 action_time = action_end_time - action_start_time
-                log.append(f"Pressed panel key '{key}' (took {action_time:.6f} seconds)")
-                # time.sleep(self.app.interface_switch_time)
+                log.append(
+                    f"Pressed panel key '{key}' {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
 
             elif action_type == 'press_specific_panel_key':
                 panel = action.get('panel')
-                specific_panel_keys = {
-                    'Inventory': self.app.inventory_key,
-                    'Prayer': self.app.prayer_key,
-                    'Spells': self.app.spells_key
-                }
-                specific_panel_key = specific_panel_keys.get(panel)
-                pyautogui.press(specific_panel_key)
+                if panel == 'Custom':
+                    key = action.get('custom_key')
+                else:
+                    specific_panel_keys = {
+                        'Inventory': self.app.inventory_key,
+                        'Prayer': self.app.prayer_key,
+                        'Spells': self.app.spells_key
+                    }
+                    key = specific_panel_keys.get(panel)
+                pyautogui.press(key)
                 action_end_time = time.time()
                 action_time = action_end_time - action_start_time
                 log.append(
-                    f"Pressed specific panel key '{specific_panel_key}' for panel '{panel}' (took {action_time:.6f} seconds)")
-                # time.sleep(self.app.action_registration_time())
+                    f"Pressed specific panel key '{key}' for panel '{panel}' {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
 
             elif action_type == 'click':
                 positions = action.get('positions', [])
                 use_saved_target = action.get('use_saved_target', False)
+                modifiers = action.get('modifiers', [])
+                modifier_keys = {'Shift': 'shift', 'Ctrl': 'ctrl', 'Alt': 'alt'}
+
+                # Press down modifiers
+                for mod in modifiers:
+                    pyautogui.keyDown(modifier_keys[mod])
 
                 if use_saved_target:
                     pos = original_position
@@ -161,45 +170,51 @@ class Macro:
                         # Log time for each click
                         action_end_time = time.time()
                         action_time = action_end_time - action_start_time
-                        log.append(f"Clicked at position {p} (took {action_time:.6f} seconds)")
+                        log.append(
+                            f"Clicked at position {p} with modifiers {modifiers} {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
                         action_start_time = time.time()
-                        # time.sleep(self.app.action_registration_time())
                 else:
                     # Single position
                     pyautogui.moveTo(pos[0], pos[1], duration=self.app.mouse_move_duration)
                     pyautogui.click()
                     action_end_time = time.time()
                     action_time = action_end_time - action_start_time
-                    log.append(f"Clicked at position {pos} (took {action_time:.6f} seconds)")
-                    # time.sleep(self.app.action_registration_time())
+                    log.append(
+                        f"Clicked at position {pos} with modifiers {modifiers} {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+
+                # Release modifiers
+                for mod in modifiers:
+                    pyautogui.keyUp(modifier_keys[mod])
 
             elif action_type == 'return_mouse':
                 pyautogui.moveTo(original_position[0], original_position[1], duration=self.app.mouse_move_duration)
                 action_end_time = time.time()
                 action_time = action_end_time - action_start_time
-                log.append(f"Mouse returned to original position (took {action_time:.6f} seconds)")
+                log.append(
+                    f"Mouse returned to original position {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
                 click_after_return = action.get('click_after_return', False)
                 if click_after_return:
                     pyautogui.click()
                     action_end_time = time.time()
                     action_time = action_end_time - action_start_time
-                    log.append(f"Clicked after returning to original position (took {action_time:.6f} seconds)")
-                # time.sleep(self.app.action_registration_time())
-
-            elif action_type == 'return_to_inventory':
-                pyautogui.press(self.app.inventory_key)
-                action_end_time = time.time()
-                action_time = action_end_time - action_start_time
-                log.append(
-                    f"Pressed inventory key '{self.app.inventory_key}' to return to Inventory (took {action_time:.6f} seconds)")
-                # time.sleep(self.app.interface_switch_time)
+                    log.append(
+                        f"Clicked after returning to original position {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
 
             elif action_type == 'wait':
                 duration = action.get('duration', self.app.action_registration_time())
                 time.sleep(duration)
                 action_end_time = time.time()
                 action_time = action_end_time - action_start_time
-                log.append(f"Waited for {duration} seconds (took {action_time:.6f} seconds)")
+                log.append(
+                    f"Waited for {duration} seconds {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+
+            elif action_type == 'return_to_inventory':
+                # Backward compatibility
+                pyautogui.press(self.app.inventory_key)
+                action_end_time = time.time()
+                action_time = action_end_time - action_start_time
+                log.append(
+                    f"Pressed inventory key '{self.app.inventory_key}' to return to Inventory {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
 
             else:
                 log.append(f"Unknown action type: {action_type}")
@@ -361,16 +376,26 @@ class MacroApp(tk.Tk):
 
     def create_macros_tab(self):
         # Treeview to display macros
-        self.macro_list = ttk.Treeview(self.macro_frame, columns=('Name', 'Hotkey', 'Doses'), show='headings')
+        self.macro_list = ttk.Treeview(self.macro_frame, columns=('Name', 'Hotkey', 'Doses', 'Call Count', 'Reset'),
+                                       show='headings')
         self.macro_list.heading('Name', text='Name')
         self.macro_list.heading('Hotkey', text='Hotkey')
         self.macro_list.heading('Doses', text='Doses')  # Indicates dose-counting macros
+        self.macro_list.heading('Call Count', text='Call Count')
+        self.macro_list.heading('Reset', text='Reset')
         self.macro_list.pack(expand=True, fill='both')
 
         # Populate the treeview with existing macros
         for macro in self.config['macros']:
             doses = macro['dose_count'] if macro.get('is_dose_macro', False) else "N/A"
-            self.macro_list.insert('', 'end', values=(macro['name'], macro['hotkey'], doses))
+            call_count = macro.get('call_count', 0) if macro.get('is_dose_macro', False) else ""
+            reset_text = 'Reset' if macro.get('is_dose_macro', False) else ""
+            self.macro_list.insert('', 'end', values=(macro['name'], macro['hotkey'], doses, call_count, reset_text))
+
+        # Bind double-click event
+        self.macro_list.bind('<Double-1>', self.on_macro_double_click)
+        # Bind click event
+        self.macro_list.bind('<ButtonRelease-1>', self.on_macro_click)
 
         # Buttons
         btn_frame = ttk.Frame(self.macro_frame)
@@ -385,8 +410,25 @@ class MacroApp(tk.Tk):
         del_macro_btn = ttk.Button(btn_frame, text="Delete Macro", command=self.delete_macro)
         del_macro_btn.pack(side='left', padx=5)
 
-        reset_macro_btn = ttk.Button(btn_frame, text="Reset Call Count", command=self.reset_macro_call_count)
-        reset_macro_btn.pack(side='left', padx=5)
+        # Reset button moved next to each macro in the list
+
+    def on_macro_double_click(self, event):
+        self.edit_macro()
+
+    def on_macro_click(self, event):
+        item = self.macro_list.identify_row(event.y)
+        column = self.macro_list.identify_column(event.x)
+        if not item:
+            return
+        if column == '#5':  # Assuming 'Reset' is the 5th column
+            values = self.macro_list.item(item, 'values')
+            macro_name = values[0]
+            macro = next((m for m in self.macro_list_data if m.name == macro_name), None)
+            if macro and macro.is_dose_macro:
+                macro.reset_call_count()
+                self.save_config()
+                self.log(f"Call count for macro '{macro_name}' has been reset.")
+                self.update_macro_call_count(macro)
 
     def create_settings_tab(self):
         row = 0
@@ -559,32 +601,17 @@ class MacroApp(tk.Tk):
         self.hotkey_manager.register_hotkeys(self.macro_list_data)
 
     def update_macro_call_count(self, macro):
-        # Find the macro in the treeview and update its 'Doses' column if it's a dose-counting macro
+        # Find the macro in the treeview and update its 'Doses' and 'Call Count' columns
         for item in self.macro_list.get_children():
             values = self.macro_list.item(item, 'values')
             if values[0] == macro.name:
                 doses = macro.dose_count if macro.is_dose_macro else "N/A"
-                self.macro_list.item(item, values=(macro.name, macro.hotkey, doses))
+                call_count = macro.call_count if macro.is_dose_macro else ""
+                reset_text = 'Reset' if macro.is_dose_macro else ""
+                self.macro_list.item(item, values=(macro.name, macro.hotkey, doses, call_count, reset_text))
                 break
 
-    def reset_macro_call_count(self):
-        selected_item = self.macro_list.selection()
-        if not selected_item:
-            messagebox.showwarning("No Selection", "Please select a macro to reset call count.")
-            return
-        values = self.macro_list.item(selected_item, 'values')
-        macro_name = values[0]
-        # Find the corresponding macro in config
-        macro = next((m for m in self.macro_list_data if m.name == macro_name), None)
-        if not macro:
-            messagebox.showerror("Error", "Selected macro not found.")
-            return
-        if macro.is_dose_macro:
-            macro.reset_call_count()
-            self.save_config()
-            self.log(f"Call count for macro '{macro_name}' has been reset.")
-        else:
-            messagebox.showinfo("Not Applicable", "Call count reset is only applicable to dose-counting macros.")
+    # Removed reset_macro_call_count method since reset button is moved to each macro in the list
 
 
 # MacroEditor Class
@@ -629,6 +656,9 @@ class MacroEditor(tk.Toplevel):
         self.actions_listbox = tk.Listbox(self, height=15, width=50)
         self.actions_listbox.grid(row=5, column=1, padx=10, pady=5, sticky='w')
 
+        # Bind double-click event
+        self.actions_listbox.bind('<Double-1>', self.on_action_double_click)
+
         # Buttons for actions
         btn_frame = ttk.Frame(self)
         btn_frame.grid(row=5, column=2, padx=10, pady=5, sticky='n')
@@ -658,6 +688,9 @@ class MacroEditor(tk.Toplevel):
         if self.macro_config:
             self.load_macro_data()
 
+    def on_action_double_click(self, event):
+        self.edit_action()
+
     def toggle_dose_count_entry(self):
         if self.is_dose_macro_var.get():
             self.dose_count_entry.config(state='normal')
@@ -668,23 +701,27 @@ class MacroEditor(tk.Toplevel):
 
     def get_action_description(self, action):
         action_type = action.get('type')
+        annotation = action.get('annotation', '')
         if action_type == 'press_panel_key':
-            return f"Press Panel Key '{action.get('key')}'"
+            return f"Press Panel Key '{action.get('key')}' {f'({annotation})' if annotation else ''}"
         elif action_type == 'press_specific_panel_key':
-            return f"Press Specific Panel Key '{action.get('panel')}'"
+            if action.get('panel') == 'Custom':
+                return f"Press Specific Panel Key '{action.get('custom_key')}' {f'({annotation})' if annotation else ''}"
+            else:
+                return f"Press Specific Panel Key '{action.get('panel')}' {f'({annotation})' if annotation else ''}"
         elif action_type == 'click':
             if action.get('use_saved_target', False):
-                return "Click at Saved Target Position"
+                return f"Click at Saved Target Position {f'({annotation})' if annotation else ''}"
             else:
                 positions = action.get('positions', [])
-                return f"Click at Positions {positions}"
+                modifiers = action.get('modifiers', [])
+                return f"Click at Positions {positions} with modifiers {modifiers} {f'({annotation})' if annotation else ''}"
         elif action_type == 'return_mouse':
             return "Return Mouse to Original Position" + (
-                " and Click" if action.get('click_after_return', False) else "")
-        elif action_type == 'return_to_inventory':
-            return "Return to Inventory"
+                " and Click" if action.get('click_after_return', False) else "") + (
+                       f" ({annotation})" if annotation else "")
         elif action_type == 'wait':
-            return f"Wait for {action.get('duration')} seconds"
+            return f"Wait for {action.get('duration')} seconds {f'({annotation})' if annotation else ''}"
         else:
             return "Unknown Action"
 
@@ -803,7 +840,10 @@ class MacroEditor(tk.Toplevel):
         self.parent.macro_list.delete(*self.parent.macro_list.get_children())
         for macro in self.parent.config['macros']:
             doses = macro['dose_count'] if macro.get('is_dose_macro', False) else "N/A"
-            self.parent.macro_list.insert('', 'end', values=(macro['name'], macro['hotkey'], doses))
+            call_count = macro.get('call_count', 0) if macro.get('is_dose_macro', False) else ""
+            reset_text = 'Reset' if macro.get('is_dose_macro', False) else ""
+            self.parent.macro_list.insert('', 'end',
+                                          values=(macro['name'], macro['hotkey'], doses, call_count, reset_text))
         self.parent.register_hotkeys()
         self.parent.log(f"Macro '{name}' has been saved.")
         self.destroy()
@@ -817,14 +857,13 @@ class ActionEditor(tk.Toplevel):
         self.action = action
         self.index = index
         self.title("Action Editor")
-        self.geometry("500x400")
+        self.geometry("500x500")
         self.create_widgets()
 
     def create_widgets(self):
         # Action Type
         ttk.Label(self, text="Action Type:").grid(row=0, column=0, padx=10, pady=5, sticky='e')
-        self.action_types = ["Press Panel Key", "Press Specific Panel Key", "Click", "Return Mouse",
-                             "Return to Inventory", "Wait"]
+        self.action_types = ["Press Panel Key", "Press Specific Panel Key", "Click", "Return Mouse", "Wait"]
         self.selected_action_type = tk.StringVar()
         self.selected_action_type.set(self.action_types[0])
         self.action_type_menu = ttk.OptionMenu(self, self.selected_action_type, self.action_types[0],
@@ -835,9 +874,14 @@ class ActionEditor(tk.Toplevel):
         self.params_frame = ttk.Frame(self)
         self.params_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=5)
 
+        # Annotation
+        ttk.Label(self, text="Annotation:").grid(row=2, column=0, padx=10, pady=5, sticky='e')
+        self.annotation_entry = ttk.Entry(self, width=50)
+        self.annotation_entry.grid(row=2, column=1, columnspan=2, padx=10, pady=5, sticky='w')
+
         # Save Button
         save_btn = ttk.Button(self, text="Save Action", command=self.save_action)
-        save_btn.grid(row=2, column=0, columnspan=2, pady=20)
+        save_btn.grid(row=3, column=0, columnspan=2, pady=20)
 
         if self.action:
             # Load action data
@@ -858,12 +902,16 @@ class ActionEditor(tk.Toplevel):
             self.key_entry.grid(row=0, column=1, padx=5, pady=5)
         elif action_type == "Press Specific Panel Key":
             ttk.Label(self.params_frame, text="Panel:").grid(row=0, column=0, padx=5, pady=5)
-            self.panel_options = ["Inventory", "Prayer", "Spells"]
+            self.panel_options = ["Inventory", "Prayer", "Spells", "Custom"]
             self.selected_panel = tk.StringVar()
-            self.selected_panel.set(self.panel_options[0])
+            self.selected_panel.set("Inventory")
             self.panel_menu = ttk.OptionMenu(self.params_frame, self.selected_panel, self.panel_options[0],
-                                             *self.panel_options)
+                                             *self.panel_options, command=self.toggle_custom_panel_entry)
             self.panel_menu.grid(row=0, column=1, padx=5, pady=5)
+            # Custom panel key entry
+            self.custom_panel_key_entry = ttk.Entry(self.params_frame)
+            self.custom_panel_key_entry.grid(row=1, column=1, padx=5, pady=5)
+            self.custom_panel_key_entry.grid_remove()
         elif action_type == "Click":
             self.use_saved_target_var = tk.BooleanVar()
             self.use_saved_target_check = ttk.Checkbutton(self.params_frame, text="Use Saved Target Position",
@@ -882,6 +930,18 @@ class ActionEditor(tk.Toplevel):
 
             del_pos_btn = ttk.Button(btn_frame, text="Delete Position", command=self.delete_click_position)
             del_pos_btn.pack(side='top', padx=5, pady=2)
+
+            # Modifiers
+            ttk.Label(self.params_frame, text="Modifiers:").grid(row=2, column=0, padx=5, pady=5, sticky='e')
+            self.shift_var = tk.BooleanVar()
+            self.ctrl_var = tk.BooleanVar()
+            self.alt_var = tk.BooleanVar()
+            self.shift_check = ttk.Checkbutton(self.params_frame, text="Shift", variable=self.shift_var)
+            self.shift_check.grid(row=2, column=1, padx=5, pady=5, sticky='w')
+            self.ctrl_check = ttk.Checkbutton(self.params_frame, text="Ctrl", variable=self.ctrl_var)
+            self.ctrl_check.grid(row=2, column=1, padx=5, pady=5)
+            self.alt_check = ttk.Checkbutton(self.params_frame, text="Alt", variable=self.alt_var)
+            self.alt_check.grid(row=2, column=1, padx=5, pady=5, sticky='e')
         elif action_type == "Return Mouse":
             self.click_after_return_var = tk.BooleanVar()
             self.click_after_return_check = ttk.Checkbutton(self.params_frame, text="Click After Return",
@@ -891,27 +951,45 @@ class ActionEditor(tk.Toplevel):
             ttk.Label(self.params_frame, text="Duration (s):").grid(row=0, column=0, padx=5, pady=5)
             self.duration_entry = ttk.Entry(self.params_frame)
             self.duration_entry.grid(row=0, column=1, padx=5, pady=5)
-        # No additional parameters for "Return to Inventory"
+        # No additional parameters for other actions
+
+    def toggle_custom_panel_entry(self, *args):
+        if self.selected_panel.get() == 'Custom':
+            self.custom_panel_key_entry.grid()
+        else:
+            self.custom_panel_key_entry.grid_remove()
 
     def load_action_data(self):
         action_type = self.action.get('type')
         if action_type == 'press_panel_key':
             self.key_entry.insert(0, self.action.get('key', ''))
         elif action_type == 'press_specific_panel_key':
-            self.selected_panel.set(self.action.get('panel', 'Inventory'))
+            panel = self.action.get('panel', 'Inventory')
+            self.selected_panel.set(panel)
+            if panel == 'Custom':
+                self.custom_panel_key_entry.insert(0, self.action.get('custom_key', ''))
+                self.custom_panel_key_entry.grid()
+            else:
+                self.custom_panel_key_entry.grid_remove()
         elif action_type == 'click':
             self.use_saved_target_var.set(self.action.get('use_saved_target', False))
             positions = self.action.get('positions', [])
             for pos in positions:
                 self.positions_listbox.insert('end', str(pos))
+            modifiers = self.action.get('modifiers', [])
+            self.shift_var.set('Shift' in modifiers)
+            self.ctrl_var.set('Ctrl' in modifiers)
+            self.alt_var.set('Alt' in modifiers)
         elif action_type == 'return_mouse':
             self.click_after_return_var.set(self.action.get('click_after_return', False))
         elif action_type == 'wait':
             self.duration_entry.insert(0, str(self.action.get('duration', 0)))
+        # Load annotation
+        self.annotation_entry.insert(0, self.action.get('annotation', ''))
 
     def add_click_position(self):
         self.info_label = ttk.Label(self, text="Move the mouse to the desired position and press 's' to set.")
-        self.info_label.grid(row=3, column=0, columnspan=2, padx=10, pady=5)
+        self.info_label.grid(row=4, column=0, columnspan=2, padx=10, pady=5)
 
         self.wait_for_position()
 
@@ -946,10 +1024,22 @@ class ActionEditor(tk.Toplevel):
                 'key': self.key_entry.get()
             }
         elif action_type == "Press Specific Panel Key":
-            action = {
-                'type': 'press_specific_panel_key',
-                'panel': self.selected_panel.get()
-            }
+            panel = self.selected_panel.get()
+            if panel == 'Custom':
+                custom_key = self.custom_panel_key_entry.get()
+                if not custom_key:
+                    messagebox.showerror("Missing Information", "Please enter a custom panel key.")
+                    return
+                action = {
+                    'type': 'press_specific_panel_key',
+                    'panel': 'Custom',
+                    'custom_key': custom_key
+                }
+            else:
+                action = {
+                    'type': 'press_specific_panel_key',
+                    'panel': panel
+                }
         elif action_type == "Click":
             use_saved_target = self.use_saved_target_var.get()
             positions = []
@@ -959,19 +1049,23 @@ class ActionEditor(tk.Toplevel):
                 except (ValueError, SyntaxError):
                     messagebox.showerror("Invalid Positions", "Click positions must be in the format (x, y).")
                     return
+            modifiers = []
+            if self.shift_var.get():
+                modifiers.append('Shift')
+            if self.ctrl_var.get():
+                modifiers.append('Ctrl')
+            if self.alt_var.get():
+                modifiers.append('Alt')
             action = {
                 'type': 'click',
                 'use_saved_target': use_saved_target,
-                'positions': positions
+                'positions': positions,
+                'modifiers': modifiers
             }
         elif action_type == "Return Mouse":
             action = {
                 'type': 'return_mouse',
                 'click_after_return': self.click_after_return_var.get()
-            }
-        elif action_type == "Return to Inventory":
-            action = {
-                'type': 'return_to_inventory'
             }
         elif action_type == "Wait":
             try:
@@ -983,9 +1077,18 @@ class ActionEditor(tk.Toplevel):
                 'type': 'wait',
                 'duration': duration
             }
+        else:
+            messagebox.showerror("Invalid Action", "Unknown action type.")
+            return
+
+        # Save annotation
+        annotation = self.annotation_entry.get().strip()
+        if annotation:
+            action['annotation'] = annotation
 
         # Save the action to parent
         if self.action is not None:
+        
             # Editing existing action
             self.parent.actions_list[self.index] = action
             self.parent.actions_listbox.delete(self.index)

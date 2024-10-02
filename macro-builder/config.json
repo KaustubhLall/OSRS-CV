@@ -1,7 +1,7 @@
 {
     "interface_switch_time": 0.1,
-    "action_registration_time_min": 0.1,
-    "action_registration_time_max": 0.15,
+    "action_registration_time_min": 0.075,
+    "action_registration_time_max": 0.075,
     "panel_key": "q",
     "specific_panel_keys": {
         "Inventory": "w",
@@ -626,5 +626,5 @@
             "current_position_index": 0
         }
     ],
-    "mouse_move_duration": 0.1
+    "mouse_move_duration": 0.05
 }

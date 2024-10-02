@@ -1,7 +1,7 @@
 {
-    "interface_switch_time": 0.3,
-    "action_registration_time_min": 0.02,
-    "action_registration_time_max": 0.05,
+    "interface_switch_time": 0.01,
+    "action_registration_time_min": 0.01,
+    "action_registration_time_max": 0.01,
     "panel_key": "q",
     "specific_panel_keys": {
         "Inventory": "w",
@@ -10,8 +10,8 @@
     },
     "macros": [
         {
-            "name": "test",
-            "hotkey": "x",
+            "name": "PRAYER FLICK",
+            "hotkey": "b",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
@@ -26,22 +26,43 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1900,
-                            1012
+                            1887,
+                            772
                         ],
                         [
-                            1908,
-                            1187
+                            1888,
+                            1183
                         ],
                         [
-                            2050,
-                            1100
+                            1971,
+                            1181
+                        ],
+                        [
+                            1971,
+                            1016
                         ]
                     ]
                 },
                 {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
                     "type": "return_mouse",
                     "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "SUPER RESTORE",
+            "hotkey": "z",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
                 },
                 {
                     "type": "press_specific_panel_key",
@@ -52,8 +73,546 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1912,
-                            1007
+                            2203,
+                            771
+                        ],
+                        [
+                            2110,
+                            845
+                        ],
+                        [
+                            2186,
+                            850
+                        ],
+                        [
+                            2096,
+                            929
+                        ],
+                        [
+                            2199,
+                            928
+                        ]
+                    ]
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": true
+                }
+            ],
+            "is_dose_macro": true,
+            "dose_count": 4,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "PRAYER RANGED",
+            "hotkey": "2",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1893,
+                            1011
+                        ]
+                    ]
+                },
+                {
+                    "type": "return_to_inventory"
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "PRAYER MELEE",
+            "hotkey": "3",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1964,
+                            1016
+                        ]
+                    ]
+                },
+                {
+                    "type": "return_to_inventory"
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "PRAYER MAGE",
+            "hotkey": "1",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2047,
+                            1017
+                        ]
+                    ]
+                },
+                {
+                    "type": "return_to_inventory"
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "SPELL BARRAGE",
+            "hotkey": "c",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1902,
+                            981
+                        ]
+                    ]
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                },
+                {
+                    "type": "return_to_inventory"
+                }
+            ],
+            "is_dose_macro": false,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "LOADOUT_SPINDEL",
+            "hotkey": "L",
+            "actions": [
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1319,
+                            967
+                        ]
+                    ]
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            845,
+                            976
+                        ]
+                    ]
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            523,
+                            246
+                        ],
+                        [
+                            515,
+                            345
+                        ],
+                        [
+                            621,
+                            230
+                        ],
+                        [
+                            626,
+                            302
+                        ],
+                        [
+                            738,
+                            236
+                        ],
+                        [
+                            730,
+                            303
+                        ],
+                        [
+                            851,
+                            236
+                        ],
+                        [
+                            840,
+                            295
+                        ],
+                        [
+                            943,
+                            245
+                        ],
+                        [
+                            946,
+                            323
+                        ],
+                        [
+                            1069,
+                            235
+                        ]
+                    ]
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            402,
+                            62
+                        ],
+                        [
+                            1917,
+                            762
+                        ],
+                        [
+                            2003,
+                            767
+                        ],
+                        [
+                            2110,
+                            764
+                        ],
+                        [
+                            2197,
+                            764
+                        ],
+                        [
+                            1921,
+                            839
+                        ],
+                        [
+                            2010,
+                            844
+                        ],
+                        [
+                            2105,
+                            844
+                        ],
+                        [
+                            2188,
+                            846
+                        ],
+                        [
+                            1914,
+                            927
+                        ],
+                        [
+                            2000,
+                            924
+                        ],
+                        [
+                            2109,
+                            925
+                        ]
+                    ]
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            394,
+                            63
+                        ]
+                    ]
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            511,
+                            404
+                        ],
+                        [
+                            510,
+                            482
+                        ],
+                        [
+                            624,
+                            409
+                        ],
+                        [
+                            616,
+                            479
+                        ],
+                        [
+                            723,
+                            411
+                        ],
+                        [
+                            705,
+                            481
+                        ],
+                        [
+                            835,
+                            409
+                        ],
+                        [
+                            832,
+                            478
+                        ],
+                        [
+                            949,
+                            393
+                        ],
+                        [
+                            935,
+                            471
+                        ],
+                        [
+                            1059,
+                            407
+                        ],
+                        [
+                            1050,
+                            487
+                        ],
+                        [
+                            1167,
+                            400
+                        ],
+                        [
+                            1146,
+                            463
+                        ],
+                        [
+                            1280,
+                            406
+                        ],
+                        [
+                            1286,
+                            474
+                        ],
+                        [
+                            511,
+                            556
+                        ],
+                        [
+                            509,
+                            627
+                        ],
+                        [
+                            623,
+                            562
+                        ],
+                        [
+                            614,
+                            647
+                        ],
+                        [
+                            727,
+                            556
+                        ],
+                        [
+                            704,
+                            646
+                        ],
+                        [
+                            845,
+                            566
+                        ],
+                        [
+                            841,
+                            640
+                        ],
+                        [
+                            949,
+                            565
+                        ],
+                        [
+                            949,
+                            657
+                        ],
+                        [
+                            1041,
+                            555
+                        ],
+                        [
+                            1037,
+                            643
+                        ],
+                        [
+                            948,
+                            988
+                        ],
+                        [
+                            948,
+                            988
+                        ],
+                        [
+                            1056,
+                            559
+                        ],
+                        [
+                            1055,
+                            562
+                        ],
+                        [
+                            1045,
+                            572
+                        ],
+                        [
+                            1059,
+                            558
+                        ],
+                        [
+                            885,
+                            981
+                        ],
+                        [
+                            943,
+                            402
+                        ],
+                        [
+                            946,
+                            486
+                        ],
+                        [
+                            846,
+                            981
+                        ]
+                    ]
+                }
+            ],
+            "is_dose_macro": false,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "PANIC",
+            "hotkey": "`",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1898,
+                            755
+                        ]
+                    ]
+                }
+            ],
+            "is_dose_macro": false,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "MELEE SPEC",
+            "hotkey": "a",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2060,
+                            1108
+                        ]
+                    ]
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1969,
+                            1181
+                        ]
+                    ]
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1911,
+                            758
+                        ]
+                    ]
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1974,
+                            369
                         ]
                     ]
                 },
@@ -66,5 +625,6 @@
             "call_count": 0,
             "current_position_index": 0
         }
-    ]
+    ],
+    "mouse_move_duration": 0.0
 }

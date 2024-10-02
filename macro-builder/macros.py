@@ -121,7 +121,7 @@ class Macro:
                 key = action.get('key', self.app.panel_key)
                 pyautogui.press(key)
                 log.append(f"Pressed panel key '{key}'")
-                time.sleep(self.app.interface_switch_time)
+                # time.sleep(self.app.interface_switch_time)
 
             elif action_type == 'press_specific_panel_key':
                 panel = action.get('panel')
@@ -133,7 +133,7 @@ class Macro:
                 specific_panel_key = specific_panel_keys.get(panel)
                 pyautogui.press(specific_panel_key)
                 log.append(f"Pressed specific panel key '{specific_panel_key}' for panel '{panel}'")
-                time.sleep(self.app.action_registration_time())
+                # time.sleep(self.app.action_registration_time())
 
             elif action_type == 'click':
                 positions = action.get('positions', [])
@@ -151,30 +151,30 @@ class Macro:
                 if isinstance(pos[0], (list, tuple)):
                     # List of positions
                     for p in pos:
-                        pyautogui.moveTo(p[0], p[1])
+                        pyautogui.moveTo(p[0], p[1], duration=self.app.mouse_move_duration)
                         pyautogui.click()
                         log.append(f"Clicked at position {p}")
-                        time.sleep(self.app.action_registration_time())
+                        # time.sleep(self.app.action_registration_time())
                 else:
                     # Single position
-                    pyautogui.moveTo(pos[0], pos[1])
+                    pyautogui.moveTo(pos[0], pos[1], duration=self.app.mouse_move_duration)
                     pyautogui.click()
                     log.append(f"Clicked at position {pos}")
-                    time.sleep(self.app.action_registration_time())
+                    # time.sleep(self.app.action_registration_time())
 
             elif action_type == 'return_mouse':
-                pyautogui.moveTo(original_position)
+                pyautogui.moveTo(original_position[0], original_position[1], duration=self.app.mouse_move_duration)
                 log.append("Mouse returned to original position")
                 click_after_return = action.get('click_after_return', False)
                 if click_after_return:
                     pyautogui.click()
                     log.append("Clicked after returning to original position")
-                time.sleep(self.app.action_registration_time())
+                # time.sleep(self.app.action_registration_time())
 
             elif action_type == 'return_to_inventory':
                 pyautogui.press(self.app.inventory_key)
                 log.append(f"Pressed inventory key '{self.app.inventory_key}' to return to Inventory")
-                time.sleep(self.app.interface_switch_time)
+                # time.sleep(self.app.interface_switch_time)
 
             elif action_type == 'wait':
                 duration = action.get('duration', self.app.action_registration_time())
@@ -186,10 +186,9 @@ class Macro:
 
         end_time = time.time()
         total_time = end_time - start_time
-        log.append(f"Macro '{self.name}' executed in {total_time:.3f} seconds")
 
-        log_message = "\n".join(log)
-        self.app.after(0, self.app.log, log_message)
+        # Use a method in app to handle logging the macro execution
+        self.app.after(0, self.app.log_macro_execution, self.name, log, total_time)
 
     def get_total_positions(self):
         # Returns the total number of positions for dose counting
@@ -226,9 +225,10 @@ class MacroApp(tk.Tk):
         self.config_load()
 
         # Timing configurations
-        self.interface_switch_time = self.config.get("interface_switch_time", 0.3)
+        self.interface_switch_time = self.config.get("interface_switch_time", 0.02)
         self.action_registration_time_min = self.config.get("action_registration_time_min", 0.02)
-        self.action_registration_time_max = self.config.get("action_registration_time_max", 0.05)
+        self.action_registration_time_max = self.config.get("action_registration_time_max", 0.02)
+        self.mouse_move_duration = self.config.get("mouse_move_duration", 0)
 
         # Panel keys
         self.panel_key = self.config.get("panel_key", "q")
@@ -260,9 +260,10 @@ class MacroApp(tk.Tk):
         except FileNotFoundError:
             # If config.json doesn't exist, create default config
             self.config = {
-                "interface_switch_time": 0.3,
+                "interface_switch_time": 0.02,
                 "action_registration_time_min": 0.02,
-                "action_registration_time_max": 0.05,
+                "action_registration_time_max": 0.02,
+                "mouse_move_duration": 0,
                 "panel_key": "q",
                 "specific_panel_keys": {
                     "Inventory": "w",
@@ -316,8 +317,14 @@ class MacroApp(tk.Tk):
         self.mouse_pos_label.pack(side='bottom')
 
         # Log Display
-        self.log_text = tk.Text(self, height=10)
-        self.log_text.pack(expand=False, fill='x', side='bottom')
+        self.log_text = tk.Text(self, height=15)
+        self.log_text.pack(expand=True, fill='both', side='bottom')
+        # Configure tags for coloring
+        self.log_text.tag_configure('timestamp', foreground='grey')
+        self.log_text.tag_configure('macro_name', foreground='blue')
+        self.log_text.tag_configure('action', foreground='black')
+        self.log_text.tag_configure('error', foreground='red')
+        self.log_text.tag_configure('success', foreground='green')
 
         # Add Enable/Disable Macros button
         self.toggle_macros_button = ttk.Button(self, text="Disable Macros", command=self.toggle_macros)
@@ -384,6 +391,14 @@ class MacroApp(tk.Tk):
         self.action_time_max_entry.grid(row=row, column=1, padx=5, pady=5)
         row += 1
 
+        # Mouse Move Duration
+        ttk.Label(self.settings_frame, text="Mouse Move Duration (s):").grid(row=row, column=0, sticky='e', padx=5,
+                                                                             pady=5)
+        self.mouse_move_duration_entry = ttk.Entry(self.settings_frame)
+        self.mouse_move_duration_entry.insert(0, str(self.mouse_move_duration))
+        self.mouse_move_duration_entry.grid(row=row, column=1, padx=5, pady=5)
+        row += 1
+
         # Panel Key
         ttk.Label(self.settings_frame, text="Panel Key:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
         self.panel_key_entry = ttk.Entry(self.settings_frame)
@@ -392,7 +407,8 @@ class MacroApp(tk.Tk):
         row += 1
 
         # Specific Panel Keys
-        ttk.Label(self.settings_frame, text="Inventory Panel Key:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
+        ttk.Label(self.settings_frame, text="Inventory Panel Key:").grid(row=row, column=0, sticky='e', padx=5,
+                                                                         pady=5)
         self.inventory_key_entry = ttk.Entry(self.settings_frame)
         self.inventory_key_entry.insert(0, self.inventory_key)
         self.inventory_key_entry.grid(row=row, column=1, padx=5, pady=5)
@@ -421,7 +437,20 @@ class MacroApp(tk.Tk):
 
     def log(self, message):
         timestamp = time.strftime("%H:%M:%S")
-        self.log_text.insert(tk.END, f"[{timestamp}] {message}\n")
+        self.log_text.insert(tk.END, f"[{timestamp}] {message}\n", 'timestamp')
+        self.log_text.see(tk.END)
+
+    def log_macro_execution(self, macro_name, log_messages, total_time):
+        # Insert messages into log_text widget with appropriate formatting and coloring
+
+        # Start with a header
+        self.log_text.insert(tk.END, f"Macro '{macro_name}' executed in {total_time:.3f} seconds\n", 'macro_name')
+
+        # Insert each log message
+        for msg in log_messages:
+            self.log_text.insert(tk.END, f"    {msg}\n", 'action')
+
+        # Scroll to end
         self.log_text.see(tk.END)
 
     def save_settings(self):
@@ -429,6 +458,7 @@ class MacroApp(tk.Tk):
             self.interface_switch_time = float(self.interface_switch_time_entry.get())
             self.action_registration_time_min = float(self.action_time_min_entry.get())
             self.action_registration_time_max = float(self.action_time_max_entry.get())
+            self.mouse_move_duration = float(self.mouse_move_duration_entry.get())
 
             self.panel_key = self.panel_key_entry.get()
             self.inventory_key = self.inventory_key_entry.get()
@@ -438,6 +468,7 @@ class MacroApp(tk.Tk):
             self.config['interface_switch_time'] = self.interface_switch_time
             self.config['action_registration_time_min'] = self.action_registration_time_min
             self.config['action_registration_time_max'] = self.action_registration_time_max
+            self.config['mouse_move_duration'] = self.mouse_move_duration
             self.config['panel_key'] = self.panel_key
             self.config['specific_panel_keys'] = {
                 'Inventory': self.inventory_key,

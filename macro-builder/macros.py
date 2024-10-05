@@ -208,14 +208,6 @@ class Macro:
                 log.append(
                     f"Waited for {duration} seconds {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
 
-            elif action_type == 'return_to_inventory':
-                # Backward compatibility
-                pyautogui.press(self.app.inventory_key)
-                action_end_time = time.time()
-                action_time = action_end_time - action_start_time
-                log.append(
-                    f"Pressed inventory key '{self.app.inventory_key}' to return to Inventory {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
-
             else:
                 log.append(f"Unknown action type: {action_type}")
 
@@ -240,6 +232,7 @@ class Macro:
             self.current_position_index = 0
             self.app.update_macro_call_count(self)
         self.app.log(f"Call count for macro '{self.name}' has been reset.")
+        self.app.config_save_required = True
 
 
 # Functions to load macros
@@ -376,7 +369,8 @@ class MacroApp(tk.Tk):
 
     def create_macros_tab(self):
         # Treeview to display macros
-        self.macro_list = ttk.Treeview(self.macro_frame, columns=('Name', 'Hotkey', 'Doses', 'Call Count', 'Reset'),
+        self.macro_list = ttk.Treeview(self.macro_frame,
+                                       columns=('Name', 'Hotkey', 'Doses', 'Call Count', 'Reset'),
                                        show='headings')
         self.macro_list.heading('Name', text='Name')
         self.macro_list.heading('Hotkey', text='Hotkey')
@@ -390,7 +384,8 @@ class MacroApp(tk.Tk):
             doses = macro['dose_count'] if macro.get('is_dose_macro', False) else "N/A"
             call_count = macro.get('call_count', 0) if macro.get('is_dose_macro', False) else ""
             reset_text = 'Reset' if macro.get('is_dose_macro', False) else ""
-            self.macro_list.insert('', 'end', values=(macro['name'], macro['hotkey'], doses, call_count, reset_text))
+            self.macro_list.insert('', 'end',
+                                   values=(macro['name'], macro['hotkey'], doses, call_count, reset_text))
 
         # Bind double-click event
         self.macro_list.bind('<Double-1>', self.on_macro_double_click)
@@ -409,8 +404,6 @@ class MacroApp(tk.Tk):
 
         del_macro_btn = ttk.Button(btn_frame, text="Delete Macro", command=self.delete_macro)
         del_macro_btn.pack(side='left', padx=5)
-
-        # Reset button moved next to each macro in the list
 
     def on_macro_double_click(self, event):
         self.edit_macro()
@@ -596,10 +589,6 @@ class MacroApp(tk.Tk):
             self.toggle_macros_button.config(text="Enable Macros")
             self.log("Macros disabled via killswitch.")
 
-    def register_hotkeys(self):
-        self.macro_list_data = self.load_config_macros()
-        self.hotkey_manager.register_hotkeys(self.macro_list_data)
-
     def update_macro_call_count(self, macro):
         # Find the macro in the treeview and update its 'Doses' and 'Call Count' columns
         for item in self.macro_list.get_children():
@@ -611,7 +600,9 @@ class MacroApp(tk.Tk):
                 self.macro_list.item(item, values=(macro.name, macro.hotkey, doses, call_count, reset_text))
                 break
 
-    # Removed reset_macro_call_count method since reset button is moved to each macro in the list
+    def register_hotkeys(self):
+        self.macro_list_data = self.load_config_macros()
+        self.hotkey_manager.register_hotkeys(self.macro_list_data)
 
 
 # MacroEditor Class
@@ -1088,7 +1079,6 @@ class ActionEditor(tk.Toplevel):
 
         # Save the action to parent
         if self.action is not None:
-        
             # Editing existing action
             self.parent.actions_list[self.index] = action
             self.parent.actions_listbox.delete(self.index)

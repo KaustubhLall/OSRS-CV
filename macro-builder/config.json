@@ -32,16 +32,9 @@
                         [
                             1888,
                             1183
-                        ],
-                        [
-                            1971,
-                            1181
-                        ],
-                        [
-                            1971,
-                            1016
                         ]
-                    ]
+                    ],
+                    "modifiers": []
                 },
                 {
                     "type": "press_specific_panel_key",
@@ -73,30 +66,27 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            2203,
-                            771
-                        ],
-                        [
                             2110,
-                            845
+                            836
                         ],
                         [
-                            2186,
-                            850
+                            2198,
+                            846
                         ],
                         [
-                            2096,
-                            929
+                            2098,
+                            912
                         ],
                         [
-                            2199,
-                            928
+                            2192,
+                            917
                         ]
-                    ]
+                    ],
+                    "modifiers": []
                 },
                 {
                     "type": "return_mouse",
-                    "click_after_return": true
+                    "click_after_return": false
                 }
             ],
             "is_dose_macro": true,
@@ -127,7 +117,8 @@
                     ]
                 },
                 {
-                    "type": "return_to_inventory"
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
                 },
                 {
                     "type": "return_mouse",
@@ -161,7 +152,8 @@
                     ]
                 },
                 {
-                    "type": "return_to_inventory"
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
                 },
                 {
                     "type": "return_mouse",
@@ -195,7 +187,8 @@
                     ]
                 },
                 {
-                    "type": "return_to_inventory"
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
                 },
                 {
                     "type": "return_mouse",
@@ -208,7 +201,7 @@
         },
         {
             "name": "SPELL BARRAGE",
-            "hotkey": "c",
+            "hotkey": "cc",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
@@ -229,7 +222,8 @@
                     "click_after_return": true
                 },
                 {
-                    "type": "return_to_inventory"
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
                 }
             ],
             "is_dose_macro": false,
@@ -240,16 +234,6 @@
             "name": "LOADOUT_SPINDEL",
             "hotkey": "L",
             "actions": [
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
-                        [
-                            1319,
-                            967
-                        ]
-                    ]
-                },
                 {
                     "type": "click",
                     "use_saved_target": false,
@@ -566,7 +550,7 @@
         },
         {
             "name": "MELEE SPEC",
-            "hotkey": "4",
+            "hotkey": "nHH",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
@@ -619,6 +603,653 @@
                 {
                     "type": "return_mouse",
                     "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "EAT",
+            "hotkey": "x",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2112,
+                            1006
+                        ],
+                        [
+                            2198,
+                            1015
+                        ],
+                        [
+                            2106,
+                            1093
+                        ],
+                        [
+                            2201,
+                            1086
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": true,
+            "dose_count": 4,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "swap1",
+            "hotkey": "f",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1914,
+                            926
+                        ],
+                        [
+                            1901,
+                            1007
+                        ],
+                        [
+                            1906,
+                            1086
+                        ],
+                        [
+                            2007,
+                            996
+                        ],
+                        [
+                            2006,
+                            933
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "swap2",
+            "hotkey": "d",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2013,
+                            1087
+                        ],
+                        [
+                            1903,
+                            1165
+                        ],
+                        [
+                            2008,
+                            1169
+                        ],
+                        [
+                            1916,
+                            1238
+                        ],
+                        [
+                            2009,
+                            1255
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "augury/rigour swap",
+            "hotkey": "4",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2053,
+                            1104
+                        ],
+                        [
+                            1888,
+                            1100
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": true,
+            "dose_count": 1,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "4-way swap",
+            "hotkey": "5",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1915,
+                            837
+                        ],
+                        [
+                            2010,
+                            842
+                        ],
+                        [
+                            1916,
+                            915
+                        ],
+                        [
+                            2009,
+                            923
+                        ]
+                    ],
+                    "modifiers": [],
+                    "annotation": "equipment"
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "melee spec",
+            "hotkey": "s",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2056,
+                            1098
+                        ],
+                        [
+                            1973,
+                            1175
+                        ]
+                    ],
+                    "modifiers": [],
+                    "annotation": "pray piety"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1915,
+                            835
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Custom",
+                    "custom_key": "q"
+                },
+                {
+                    "type": "wait",
+                    "duration": 0.55
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1963,
+                            375
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "SPELL BIND",
+            "hotkey": "c",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1913,
+                            1145
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                }
+            ],
+            "is_dose_macro": false,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "SPELL TB",
+            "hotkey": "v",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2012,
+                            1139
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                }
+            ],
+            "is_dose_macro": false,
+            "call_count": 0,
+            "current_position_index": 0
+        },
+        {
+            "name": "loadout_gen",
+            "hotkey": "k",
+            "actions": [
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1384,
+                            964
+                        ],
+                        [
+                            1315,
+                            956
+                        ]
+                    ],
+                    "modifiers": [],
+                    "annotation": "deposit all"
+                },
+                {
+                    "type": "wait",
+                    "duration": 0.15
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            517,
+                            237
+                        ],
+                        [
+                            512,
+                            320
+                        ],
+                        [
+                            618,
+                            223
+                        ],
+                        [
+                            620,
+                            320
+                        ],
+                        [
+                            734,
+                            235
+                        ],
+                        [
+                            716,
+                            320
+                        ],
+                        [
+                            833,
+                            327
+                        ],
+                        [
+                            839,
+                            235
+                        ],
+                        [
+                            936,
+                            334
+                        ],
+                        [
+                            933,
+                            232
+                        ],
+                        [
+                            961,
+                            979
+                        ],
+                        [
+                            1051,
+                            237
+                        ],
+                        [
+                            1049,
+                            232
+                        ],
+                        [
+                            1061,
+                            237
+                        ],
+                        [
+                            847,
+                            977
+                        ]
+                    ],
+                    "modifiers": [],
+                    "annotation": "withdraw loadout"
+                },
+                {
+                    "type": "wait",
+                    "duration": 0.2
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            394,
+                            75
+                        ],
+                        [
+                            1924,
+                            766
+                        ],
+                        [
+                            1916,
+                            847
+                        ],
+                        [
+                            1907,
+                            925
+                        ],
+                        [
+                            2016,
+                            762
+                        ],
+                        [
+                            2012,
+                            831
+                        ],
+                        [
+                            2010,
+                            926
+                        ],
+                        [
+                            2099,
+                            755
+                        ],
+                        [
+                            2198,
+                            767
+                        ],
+                        [
+                            2103,
+                            834
+                        ],
+                        [
+                            2194,
+                            844
+                        ],
+                        [
+                            2106,
+                            916
+                        ],
+                        [
+                            401,
+                            71
+                        ]
+                    ],
+                    "modifiers": [],
+                    "annotation": "equip loadout"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            512,
+                            393
+                        ],
+                        [
+                            515,
+                            493
+                        ],
+                        [
+                            636,
+                            395
+                        ],
+                        [
+                            619,
+                            484
+                        ],
+                        [
+                            735,
+                            407
+                        ],
+                        [
+                            727,
+                            465
+                        ],
+                        [
+                            843,
+                            394
+                        ],
+                        [
+                            836,
+                            476
+                        ],
+                        [
+                            950,
+                            400
+                        ],
+                        [
+                            927,
+                            474
+                        ],
+                        [
+                            1062,
+                            408
+                        ],
+                        [
+                            1059,
+                            480
+                        ],
+                        [
+                            1173,
+                            403
+                        ],
+                        [
+                            1154,
+                            475
+                        ],
+                        [
+                            1261,
+                            402
+                        ],
+                        [
+                            1260,
+                            485
+                        ],
+                        [
+                            516,
+                            571
+                        ],
+                        [
+                            526,
+                            648
+                        ],
+                        [
+                            644,
+                            567
+                        ],
+                        [
+                            622,
+                            663
+                        ],
+                        [
+                            736,
+                            563
+                        ],
+                        [
+                            736,
+                            629
+                        ],
+                        [
+                            837,
+                            571
+                        ],
+                        [
+                            826,
+                            645
+                        ],
+                        [
+                            943,
+                            570
+                        ],
+                        [
+                            945,
+                            642
+                        ],
+                        [
+                            1049,
+                            564
+                        ],
+                        [
+                            1051,
+                            640
+                        ]
+                    ],
+                    "modifiers": []
                 }
             ],
             "is_dose_macro": false,

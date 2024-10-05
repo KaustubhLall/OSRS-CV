@@ -88,6 +88,10 @@ class Macro:
         self.call_count = config.get("call_count", 0)
         self.current_position_index = config.get("current_position_index", 0)
 
+        self.is_loop_macro = config.get("is_loop_macro", False)
+        self.loop_count = config.get("loop_count", 1) if self.is_loop_macro else 1
+        self.current_loop_index = 0
+
         self.app = app
 
     def execute(self):
@@ -97,125 +101,150 @@ class Macro:
         if not self.app.macros_enabled:
             return
 
+        total_loops = self.loop_count if self.is_loop_macro else 1
+        total_log = []
         start_time = time.time()
-        log = []
 
-        if self.is_dose_macro:
-            self.call_count += 1
-            self.app.update_macro_call_count(self)
-            self.app.config_save_required = True
+        for loop_index in range(total_loops):
+            if not self.app.macros_enabled:
+                break
 
-            if self.call_count % self.dose_count == 0:
-                self.current_position_index = (self.current_position_index + 1) % self.get_total_positions()
-                log.append(f"Cycled to next position index: {self.current_position_index}")
+            self.current_loop_index = loop_index + 1
+            loop_start_time = time.time()
+            log = []
 
-        original_position = pyautogui.position()
-        log.append(f"Original mouse position: {original_position}")
+            if self.is_dose_macro:
+                self.call_count += 1
+                self.app.update_macro_call_count(self)
+                self.app.config_save_required = True
 
-        # Now iterate over actions and execute them
-        for action in self.actions:
-            action_type = action.get('type')
-            action_start_time = time.time()
-            annotation = action.get('annotation', '')
+                if self.call_count % self.dose_count == 0:
+                    self.current_position_index = (self.current_position_index + 1) % self.get_total_positions()
+                    log.append(f"Cycled to next position index: {self.current_position_index}")
 
-            if action_type == 'press_panel_key':
-                key = action.get('key', self.app.panel_key)
-                pyautogui.press(key)
-                action_end_time = time.time()
-                action_time = action_end_time - action_start_time
-                log.append(
-                    f"Pressed panel key '{key}' {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+            original_position = pyautogui.position()
+            log.append(f"Original mouse position: {original_position}")
 
-            elif action_type == 'press_specific_panel_key':
-                panel = action.get('panel')
-                if panel == 'Custom':
-                    key = action.get('custom_key')
-                else:
-                    specific_panel_keys = {
-                        'Inventory': self.app.inventory_key,
-                        'Prayer': self.app.prayer_key,
-                        'Spells': self.app.spells_key
-                    }
-                    key = specific_panel_keys.get(panel)
-                pyautogui.press(key)
-                action_end_time = time.time()
-                action_time = action_end_time - action_start_time
-                log.append(
-                    f"Pressed specific panel key '{key}' for panel '{panel}' {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+            # Now iterate over actions and execute them
+            for action in self.actions:
+                action_type = action.get('type')
+                action_start_time = time.time()
+                annotation = action.get('annotation', '')
 
-            elif action_type == 'click':
-                positions = action.get('positions', [])
-                use_saved_target = action.get('use_saved_target', False)
-                modifiers = action.get('modifiers', [])
-                modifier_keys = {'Shift': 'shift', 'Ctrl': 'ctrl', 'Alt': 'alt'}
+                if action_type == 'press_panel_key':
+                    key = action.get('key', self.app.panel_key)
+                    pyautogui.press(key)
+                    action_end_time = time.time()
+                    action_time = action_end_time - action_start_time
+                    log.append(
+                        f"Pressed panel key '{key}' {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
 
-                # Press down modifiers
-                for mod in modifiers:
-                    pyautogui.keyDown(modifier_keys[mod])
-
-                if use_saved_target:
-                    pos = original_position
-                else:
-                    if self.is_dose_macro:
-                        pos_index = self.current_position_index % len(positions)
-                        pos = positions[pos_index]
+                elif action_type == 'press_specific_panel_key':
+                    panel = action.get('panel')
+                    if panel == 'Custom':
+                        key = action.get('custom_key')
                     else:
-                        pos = positions
+                        specific_panel_keys = {
+                            'Inventory': self.app.inventory_key,
+                            'Prayer': self.app.prayer_key,
+                            'Spells': self.app.spells_key
+                        }
+                        key = specific_panel_keys.get(panel)
+                    pyautogui.press(key)
+                    action_end_time = time.time()
+                    action_time = action_end_time - action_start_time
+                    log.append(
+                        f"Pressed specific panel key '{key}' for panel '{panel}' {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
 
-                if isinstance(pos[0], (list, tuple)):
-                    # List of positions
-                    for p in pos:
-                        pyautogui.moveTo(p[0], p[1], duration=self.app.mouse_move_duration)
+                elif action_type == 'click':
+                    positions = action.get('positions', [])
+                    use_saved_target = action.get('use_saved_target', False)
+                    modifiers = action.get('modifiers', [])
+                    modifier_keys = {'Shift': 'shift', 'Ctrl': 'ctrl', 'Alt': 'alt'}
+
+                    # Press down modifiers
+                    for mod in modifiers:
+                        pyautogui.keyDown(modifier_keys[mod])
+
+                    if use_saved_target:
+                        pos = original_position
+                    else:
+                        if self.is_dose_macro:
+                            pos_index = self.current_position_index % len(positions)
+                            pos = positions[pos_index]
+                        else:
+                            pos = positions
+
+                    if isinstance(pos[0], (list, tuple)):
+                        # List of positions
+                        for p in pos:
+                            pyautogui.moveTo(p[0], p[1], duration=self.app.mouse_move_duration)
+                            pyautogui.click()
+                            # Log time for each click
+                            action_end_time = time.time()
+                            action_time = action_end_time - action_start_time
+                            log.append(
+                                f"Clicked at position {p} with modifiers {modifiers} {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+                            action_start_time = time.time()
+                    else:
+                        # Single position
+                        pyautogui.moveTo(pos[0], pos[1], duration=self.app.mouse_move_duration)
                         pyautogui.click()
-                        # Log time for each click
                         action_end_time = time.time()
                         action_time = action_end_time - action_start_time
                         log.append(
-                            f"Clicked at position {p} with modifiers {modifiers} {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
-                        action_start_time = time.time()
+                            f"Clicked at position {pos} with modifiers {modifiers} {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+
+                    # Release modifiers
+                    for mod in modifiers:
+                        pyautogui.keyUp(modifier_keys[mod])
+
+                elif action_type == 'return_mouse':
+                    pyautogui.moveTo(original_position[0], original_position[1], duration=self.app.mouse_move_duration)
+                    action_end_time = time.time()
+                    action_time = action_end_time - action_start_time
+                    log.append(
+                        f"Mouse returned to original position {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+                    click_after_return = action.get('click_after_return', False)
+                    if click_after_return:
+                        pyautogui.click()
+                        action_end_time = time.time()
+                        action_time = action_end_time - action_start_time
+                        log.append(
+                            f"Clicked after returning to original position {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+
+                elif action_type == 'wait':
+                    duration = action.get('duration', self.app.action_registration_time())
+                    if isinstance(duration, str):
+                        duration = self.app.wait_times.get(duration, self.app.action_registration_time())
+                    time.sleep(duration)
+                    action_end_time = time.time()
+                    action_time = action_end_time - action_start_time
+                    log.append(
+                        f"Waited for {duration} seconds {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+
                 else:
-                    # Single position
-                    pyautogui.moveTo(pos[0], pos[1], duration=self.app.mouse_move_duration)
-                    pyautogui.click()
-                    action_end_time = time.time()
-                    action_time = action_end_time - action_start_time
-                    log.append(
-                        f"Clicked at position {pos} with modifiers {modifiers} {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+                    log.append(f"Unknown action type: {action_type}")
 
-                # Release modifiers
-                for mod in modifiers:
-                    pyautogui.keyUp(modifier_keys[mod])
+            loop_end_time = time.time()
+            loop_total_time = loop_end_time - loop_start_time
+            total_log.append(f"Loop {self.current_loop_index}/{total_loops} executed in {loop_total_time:.3f} seconds")
+            total_log.extend(log)
 
-            elif action_type == 'return_mouse':
-                pyautogui.moveTo(original_position[0], original_position[1], duration=self.app.mouse_move_duration)
-                action_end_time = time.time()
-                action_time = action_end_time - action_start_time
-                log.append(
-                    f"Mouse returned to original position {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
-                click_after_return = action.get('click_after_return', False)
-                if click_after_return:
-                    pyautogui.click()
-                    action_end_time = time.time()
-                    action_time = action_end_time - action_start_time
-                    log.append(
-                        f"Clicked after returning to original position {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
-
-            elif action_type == 'wait':
-                duration = action.get('duration', self.app.action_registration_time())
-                time.sleep(duration)
-                action_end_time = time.time()
-                action_time = action_end_time - action_start_time
-                log.append(
-                    f"Waited for {duration} seconds {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
-
-            else:
-                log.append(f"Unknown action type: {action_type}")
+            # Update ETA tracker
+            if self.is_loop_macro:
+                loops_remaining = total_loops - self.current_loop_index
+                average_time_per_loop = (loop_end_time - start_time) / self.current_loop_index
+                estimated_time_remaining = loops_remaining * average_time_per_loop
+                self.app.after(0, self.app.update_eta_tracker, estimated_time_remaining)
 
         end_time = time.time()
         total_time = end_time - start_time
 
-        # Use a method in app to handle logging the macro execution
-        self.app.after(0, self.app.log_macro_execution, self.name, log, total_time)
+        self.app.after(0, self.app.log_macro_execution, self.name, total_log, total_time)
+        self.current_loop_index = 0
+        if self.is_loop_macro:
+            self.app.after(0, self.app.reset_eta_tracker)
 
     def get_total_positions(self):
         # Returns the total number of positions for dose counting
@@ -257,6 +286,9 @@ class MacroApp(tk.Tk):
         self.action_registration_time_min = self.config.get("action_registration_time_min", 0.02)
         self.action_registration_time_max = self.config.get("action_registration_time_max", 0.02)
         self.mouse_move_duration = self.config.get("mouse_move_duration", 0)
+
+        # Wait times
+        self.wait_times = self.config.get("wait_times", {"tick_time": 0.6})
 
         # Panel keys
         self.panel_key = self.config.get("panel_key", "q")
@@ -301,6 +333,7 @@ class MacroApp(tk.Tk):
                     "Prayer": "e",
                     "Spells": "r"
                 },
+                "wait_times": {"tick_time": 0.6},
                 "macros": []
             }
             self.save_config()
@@ -360,6 +393,10 @@ class MacroApp(tk.Tk):
         # Add Enable/Disable Macros button
         self.toggle_macros_button = ttk.Button(self, text="Disable Macros", command=self.toggle_macros)
         self.toggle_macros_button.pack(pady=5)
+
+        # ETA Label
+        self.eta_label = ttk.Label(self, text="Estimated Time Remaining: N/A")
+        self.eta_label.pack(padx=5, pady=5)
 
         # Macros tab content
         self.create_macros_tab()
@@ -484,6 +521,18 @@ class MacroApp(tk.Tk):
         self.spells_key_entry.grid(row=row, column=1, padx=5, pady=5)
         row += 1
 
+        # Wait Times
+        ttk.Label(self.settings_frame, text="Wait Times:").grid(row=row, column=0, sticky='w', padx=5, pady=5)
+        row += 1
+        self.wait_time_entries = {}
+        for wait_name in self.wait_times:
+            ttk.Label(self.settings_frame, text=f"{wait_name}:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
+            entry = ttk.Entry(self.settings_frame)
+            entry.insert(0, str(self.wait_times[wait_name]))
+            entry.grid(row=row, column=1, padx=5, pady=5)
+            self.wait_time_entries[wait_name] = entry
+            row += 1
+
         # Save Settings Button
         save_settings_btn = ttk.Button(self.settings_frame, text="Save Settings", command=self.save_settings)
         save_settings_btn.grid(row=row, column=0, columnspan=2, pady=10)
@@ -533,6 +582,15 @@ class MacroApp(tk.Tk):
                 'Prayer': self.prayer_key,
                 'Spells': self.spells_key
             }
+
+            # Save wait times
+            for wait_name, entry in self.wait_time_entries.items():
+                try:
+                    self.wait_times[wait_name] = float(entry.get())
+                except ValueError:
+                    messagebox.showerror("Invalid Input", f"Wait time '{wait_name}' must be a number.")
+                    return
+            self.config['wait_times'] = self.wait_times
 
             self.save_config()
             self.register_hotkeys()
@@ -604,6 +662,14 @@ class MacroApp(tk.Tk):
         self.macro_list_data = self.load_config_macros()
         self.hotkey_manager.register_hotkeys(self.macro_list_data)
 
+    def update_eta_tracker(self, estimated_time_remaining):
+        minutes, seconds = divmod(int(estimated_time_remaining), 60)
+        time_str = f"{minutes}m {seconds}s remaining"
+        self.eta_label.config(text=f"Estimated Time Remaining: {time_str}")
+
+    def reset_eta_tracker(self):
+        self.eta_label.config(text="Estimated Time Remaining: N/A")
+
 
 # MacroEditor Class
 class MacroEditor(tk.Toplevel):
@@ -642,17 +708,29 @@ class MacroEditor(tk.Toplevel):
         self.dose_count_entry.grid(row=4, column=1, padx=10, pady=5, sticky='w')
         self.dose_count_entry.config(state='disabled')  # Initially disabled
 
+        # Looping Macro Checkbox
+        self.is_loop_macro_var = tk.BooleanVar(value=False)
+        self.is_loop_macro_check = ttk.Checkbutton(self, text="Enable Looping", variable=self.is_loop_macro_var,
+                                                   command=self.toggle_loop_count_entry)
+        self.is_loop_macro_check.grid(row=5, column=0, columnspan=3, padx=10, pady=5, sticky='w')
+
+        # Number of Loops Entry
+        ttk.Label(self, text="Number of Loops:").grid(row=6, column=0, padx=10, pady=5, sticky='e')
+        self.loop_count_entry = ttk.Entry(self, width=10)
+        self.loop_count_entry.grid(row=6, column=1, padx=10, pady=5, sticky='w')
+        self.loop_count_entry.config(state='disabled')  # Initially disabled
+
         # Actions List
-        ttk.Label(self, text="Actions:").grid(row=5, column=0, padx=10, pady=5, sticky='ne')
+        ttk.Label(self, text="Actions:").grid(row=7, column=0, padx=10, pady=5, sticky='ne')
         self.actions_listbox = tk.Listbox(self, height=15, width=50)
-        self.actions_listbox.grid(row=5, column=1, padx=10, pady=5, sticky='w')
+        self.actions_listbox.grid(row=7, column=1, padx=10, pady=5, sticky='w')
 
         # Bind double-click event
         self.actions_listbox.bind('<Double-1>', self.on_action_double_click)
 
         # Buttons for actions
         btn_frame = ttk.Frame(self)
-        btn_frame.grid(row=5, column=2, padx=10, pady=5, sticky='n')
+        btn_frame.grid(row=7, column=2, padx=10, pady=5, sticky='n')
 
         add_action_btn = ttk.Button(btn_frame, text="Add Action", command=self.add_action)
         add_action_btn.pack(side='top', padx=5, pady=2)
@@ -671,7 +749,7 @@ class MacroEditor(tk.Toplevel):
 
         # Save Button
         save_btn = ttk.Button(self, text="Save Macro", command=self.save_macro)
-        save_btn.grid(row=6, column=0, columnspan=3, pady=20)
+        save_btn.grid(row=8, column=0, columnspan=3, pady=20)
 
         self.actions_list = []  # List to store actions
 
@@ -689,6 +767,14 @@ class MacroEditor(tk.Toplevel):
         else:
             self.dose_count_entry.delete(0, tk.END)
             self.dose_count_entry.config(state='disabled')
+
+    def toggle_loop_count_entry(self):
+        if self.is_loop_macro_var.get():
+            self.loop_count_entry.config(state='normal')
+            self.loop_count_entry.focus()
+        else:
+            self.loop_count_entry.delete(0, tk.END)
+            self.loop_count_entry.config(state='disabled')
 
     def get_action_description(self, action):
         action_type = action.get('type')
@@ -723,6 +809,10 @@ class MacroEditor(tk.Toplevel):
             self.is_dose_macro_var.set(True)
             self.dose_count_entry.config(state='normal')
             self.dose_count_entry.insert(0, str(self.macro_config.get('dose_count', 4)))
+        if self.macro_config.get('is_loop_macro', False):
+            self.is_loop_macro_var.set(True)
+            self.loop_count_entry.config(state='normal')
+            self.loop_count_entry.insert(0, str(self.macro_config.get('loop_count', 1)))
         self.actions_list = self.macro_config.get('actions', [])
         for action in self.actions_list:
             self.actions_listbox.insert('end', self.get_action_description(action))
@@ -780,12 +870,22 @@ class MacroEditor(tk.Toplevel):
         is_dose_macro = self.is_dose_macro_var.get()
         dose_count = None
 
+        is_loop_macro = self.is_loop_macro_var.get()
+        loop_count = None
+
         if is_dose_macro:
             dose_count_str = self.dose_count_entry.get().strip()
             if not dose_count_str.isdigit() or int(dose_count_str) <= 0:
                 messagebox.showerror("Invalid Input", "Number of Doses must be a positive integer.")
                 return
             dose_count = int(dose_count_str)
+
+        if is_loop_macro:
+            loop_count_str = self.loop_count_entry.get().strip()
+            if not loop_count_str.isdigit() or int(loop_count_str) <= 0:
+                messagebox.showerror("Invalid Input", "Number of Loops must be a positive integer.")
+                return
+            loop_count = int(loop_count_str)
 
         if not name or not hotkey:
             messagebox.showerror("Missing Information", "Please fill in all the required fields.")
@@ -805,7 +905,8 @@ class MacroEditor(tk.Toplevel):
             "name": name,
             "hotkey": hotkey,
             "actions": self.actions_list,
-            "is_dose_macro": is_dose_macro
+            "is_dose_macro": is_dose_macro,
+            "is_loop_macro": is_loop_macro
         }
 
         if is_dose_macro:
@@ -817,6 +918,11 @@ class MacroEditor(tk.Toplevel):
             # Ensure call_count and current_position_index are set to 0 for consistency
             new_macro["call_count"] = 0
             new_macro["current_position_index"] = 0
+
+        if is_loop_macro:
+            new_macro["loop_count"] = loop_count if is_loop_macro else 1
+        else:
+            new_macro["loop_count"] = 1
 
         if self.macro_config:
             # Update existing macro
@@ -880,6 +986,8 @@ class ActionEditor(tk.Toplevel):
             self.update_action_fields(None)
             # Populate fields based on action
             self.load_action_data()
+        else:
+            self.update_action_fields(None)
 
     def update_action_fields(self, *args):
         # Clear the params_frame
@@ -939,9 +1047,26 @@ class ActionEditor(tk.Toplevel):
                                                             variable=self.click_after_return_var)
             self.click_after_return_check.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky='w')
         elif action_type == "Wait":
-            ttk.Label(self.params_frame, text="Duration (s):").grid(row=0, column=0, padx=5, pady=5)
+            self.use_custom_wait_var = tk.BooleanVar(value=False)
+            self.use_custom_wait_check = ttk.Checkbutton(self.params_frame, text="Use Custom Wait Time",
+                                                         variable=self.use_custom_wait_var,
+                                                         command=self.toggle_wait_duration_entry)
+            self.use_custom_wait_check.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky='w')
+
+            self.wait_time_options = list(self.parent.parent.wait_times.keys())
+            self.selected_wait_time = tk.StringVar()
+            self.selected_wait_time.set(self.wait_time_options[0])
+
+            self.wait_time_menu = ttk.OptionMenu(self.params_frame, self.selected_wait_time, self.wait_time_options[0],
+                                                 *self.wait_time_options)
+            self.wait_time_menu.grid(row=1, column=1, padx=5, pady=5, sticky='w')
+            self.wait_time_menu.grid_remove()
+
+            ttk.Label(self.params_frame, text="Duration (s):").grid(row=1, column=0, padx=5, pady=5)
             self.duration_entry = ttk.Entry(self.params_frame)
-            self.duration_entry.grid(row=0, column=1, padx=5, pady=5)
+            self.duration_entry.grid(row=1, column=1, padx=5, pady=5)
+
+            self.toggle_wait_duration_entry()
         # No additional parameters for other actions
 
     def toggle_custom_panel_entry(self, *args):
@@ -949,6 +1074,14 @@ class ActionEditor(tk.Toplevel):
             self.custom_panel_key_entry.grid()
         else:
             self.custom_panel_key_entry.grid_remove()
+
+    def toggle_wait_duration_entry(self):
+        if self.use_custom_wait_var.get():
+            self.duration_entry.grid_remove()
+            self.wait_time_menu.grid()
+        else:
+            self.wait_time_menu.grid_remove()
+            self.duration_entry.grid()
 
     def load_action_data(self):
         action_type = self.action.get('type')
@@ -974,7 +1107,13 @@ class ActionEditor(tk.Toplevel):
         elif action_type == 'return_mouse':
             self.click_after_return_var.set(self.action.get('click_after_return', False))
         elif action_type == 'wait':
-            self.duration_entry.insert(0, str(self.action.get('duration', 0)))
+            duration = self.action.get('duration', 0)
+            if isinstance(duration, str):
+                self.use_custom_wait_var.set(True)
+                self.selected_wait_time.set(duration)
+                self.toggle_wait_duration_entry()
+            else:
+                self.duration_entry.insert(0, str(duration))
         # Load annotation
         self.annotation_entry.insert(0, self.action.get('annotation', ''))
 
@@ -1059,11 +1198,14 @@ class ActionEditor(tk.Toplevel):
                 'click_after_return': self.click_after_return_var.get()
             }
         elif action_type == "Wait":
-            try:
-                duration = float(self.duration_entry.get())
-            except ValueError:
-                messagebox.showerror("Invalid Input", "Duration must be a number.")
-                return
+            if self.use_custom_wait_var.get():
+                duration = self.selected_wait_time.get()
+            else:
+                try:
+                    duration = float(self.duration_entry.get())
+                except ValueError:
+                    messagebox.showerror("Invalid Input", "Duration must be a number.")
+                    return
             action = {
                 'type': 'wait',
                 'duration': duration

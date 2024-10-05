@@ -1255,6 +1255,47 @@
             "is_dose_macro": false,
             "call_count": 0,
             "current_position_index": 0
+        },
+        {
+            "name": "do a thing",
+            "hotkey": "a",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1956,
+                            864
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "wait",
+                    "duration": 0.6
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2112,
+                            1250
+                        ]
+                    ],
+                    "modifiers": []
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
         }
     ],
     "mouse_move_duration": 0.05

@@ -53,10 +53,11 @@ class HotkeyManager:
             if hotkey_keys.issubset(self.current_keys):
                 if hotkey_keys not in self.pressed_hotkeys:
                     self.pressed_hotkeys.add(hotkey_keys)
-                    if isinstance(action, Macro):
-                        action.toggle()
-                    elif callable(action):
+                    if callable(action):
                         threading.Thread(target=action).start()
+                    else:
+                        if self.app.macros_enabled:
+                            action.execute()
 
     def on_release(self, key):
         try:
@@ -91,230 +92,182 @@ class Macro:
         self.loop_count = config.get("loop_count", 1) if self.is_loop_macro else 1
         self.current_loop_index = 0
 
+        # Scheduling attributes
+        self.is_scheduled = config.get("is_scheduled", False)
+        self.schedule_interval = config.get("schedule_interval", 0)  # in seconds
+        self.scheduled_timer = None  # To keep track of the timer
+
         self.app = app
 
-        self.running = False  # Flag to indicate if the macro is running
-        self.should_stop = False  # Flag to signal the macro to stop
+    def execute(self):
+        threading.Thread(target=self.run_macro).start()
 
-    def toggle(self):
-        if not self.running:
-            self.should_stop = False
-            self.execute()
-        else:
-            self.stop()
+    def start_scheduled_execution(self):
+        if self.is_scheduled and self.schedule_interval > 0:
+            self.schedule_next_run()
 
-    def stop(self):
-        self.should_stop = True
+    def schedule_next_run(self):
+        if self.app.macros_enabled:
+            self.scheduled_timer = threading.Timer(self.schedule_interval, self.scheduled_run_macro)
+            self.scheduled_timer.start()
 
-    def execute(self, threaded=True):
-        if threaded:
-            threading.Thread(target=self.run_macro).start()
-        else:
+    def scheduled_run_macro(self):
+        if self.app.macros_enabled:
             self.run_macro()
+            self.schedule_next_run()
+
+    def stop_scheduled_execution(self):
+        if self.scheduled_timer and self.scheduled_timer.is_alive():
+            self.scheduled_timer.cancel()
 
     def run_macro(self):
         if not self.app.macros_enabled:
             return
-        if self.running:
-            return
-        self.running = True
-        try:
-            if self.is_loop_macro and self.loop_count == -1:
-                infinite_loop = True
-            else:
-                infinite_loop = False
 
-            total_loops = self.loop_count if self.is_loop_macro else 1
-            self.current_loop_index = 0
-            start_time = time.time()
-            total_log = []
+        total_loops = self.loop_count if self.is_loop_macro else 1
+        total_log = []
+        start_time = time.time()
 
-            while infinite_loop or self.current_loop_index < total_loops:
-                if self.should_stop:
-                    break
-                if not self.app.macros_enabled:
-                    break
-
-                self.current_loop_index += 1
-                loop_start_time = time.time()
-                log = []
-
-                original_position = pyautogui.position()
-                log.append(f"Original mouse position: {original_position}")
-
-                # Run actions with dose counting
-                self.run_actions(self.actions, original_position, log, local_dose_count=False)
-
-                loop_end_time = time.time()
-                loop_total_time = loop_end_time - loop_start_time
-                total_log.append(f"Loop {self.current_loop_index}/{total_loops} executed in {loop_total_time:.3f} seconds")
-                total_log.extend(log)
-
-                # Update ETA tracker
-                if self.is_loop_macro and not infinite_loop:
-                    loops_remaining = total_loops - self.current_loop_index
-                    average_time_per_loop = (loop_end_time - start_time) / self.current_loop_index
-                    estimated_time_remaining = loops_remaining * average_time_per_loop
-                    self.app.after(0, self.app.update_eta_tracker, estimated_time_remaining)
-
-            end_time = time.time()
-            total_time = end_time - start_time
-
-            self.app.after(0, self.app.log_macro_execution, self.name, total_log, total_time)
-            self.current_loop_index = 0
-            if self.is_loop_macro:
-                self.app.after(0, self.app.reset_eta_tracker)
-        finally:
-            self.running = False
-
-    def run_actions(self, actions, original_position, log, local_dose_count=False, local_state=None):
-        if local_state is None:
-            local_state = {
-                'call_count': 0,
-                'current_position_index': 0
-            }
-
-        for action in actions:
-            if self.should_stop:
+        for loop_index in range(total_loops):
+            if not self.app.macros_enabled:
                 break
 
-            action_type = action.get('type')
-            action_start_time = time.time()
-            annotation = action.get('annotation', '')
+            self.current_loop_index = loop_index + 1
+            loop_start_time = time.time()
+            log = []
 
-            if action_type == 'press_panel_key':
-                key = action.get('key', self.app.panel_key)
-                pyautogui.press(key)
-                action_end_time = time.time()
-                action_time = action_end_time - action_start_time
-                log.append(
-                    f"Pressed panel key '{key}' {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+            if self.is_dose_macro:
+                self.call_count += 1
+                self.app.update_macro_call_count(self)
+                self.app.config_save_required = True
 
-            elif action_type == 'press_specific_panel_key':
-                panel = action.get('panel')
-                if panel == 'Custom':
-                    key = action.get('custom_key')
-                else:
-                    specific_panel_keys = {
-                        'Inventory': self.app.inventory_key,
-                        'Prayer': self.app.prayer_key,
-                        'Spells': self.app.spells_key
-                    }
-                    key = specific_panel_keys.get(panel)
-                pyautogui.press(key)
-                action_end_time = time.time()
-                action_time = action_end_time - action_start_time
-                log.append(
-                    f"Pressed specific panel key '{key}' for panel '{panel}' {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+                if self.call_count % self.dose_count == 0:
+                    self.current_position_index = (self.current_position_index + 1) % self.get_total_positions()
+                    log.append(f"Cycled to next position index: {self.current_position_index}")
 
-            elif action_type == 'click':
-                positions = action.get('positions', [])
-                use_saved_target = action.get('use_saved_target', False)
-                modifiers = action.get('modifiers', [])
-                modifier_keys = {'Shift': 'shift', 'Ctrl': 'ctrl', 'Alt': 'alt'}
+            original_position = pyautogui.position()
+            log.append(f"Original mouse position: {original_position}")
 
-                # Press down modifiers
-                for mod in modifiers:
-                    pyautogui.keyDown(modifier_keys[mod])
+            # Now iterate over actions and execute them
+            for action in self.actions:
+                action_type = action.get('type')
+                action_start_time = time.time()
+                annotation = action.get('annotation', '')
 
-                if use_saved_target:
-                    pos = original_position
-                else:
-                    if self.is_dose_macro:
-                        if local_dose_count:
-                            pos_index = local_state['current_position_index'] % len(positions)
-                        else:
-                            pos_index = self.current_position_index % len(positions)
-                        pos = positions[pos_index]
-                    else:
-                        pos = positions
-
-                if isinstance(pos[0], (list, tuple)):
-                    # List of positions
-                    for p in pos:
-                        pyautogui.moveTo(p[0], p[1], duration=self.app.mouse_move_duration)
-                        pyautogui.click()
-                        # Log time for each click
-                        action_end_time = time.time()
-                        action_time = action_end_time - action_start_time
-                        log.append(
-                            f"Clicked at position {p} with modifiers {modifiers} {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
-                        action_start_time = time.time()
-                else:
-                    # Single position
-                    pyautogui.moveTo(pos[0], pos[1], duration=self.app.mouse_move_duration)
-                    pyautogui.click()
+                if action_type == 'press_panel_key':
+                    key = action.get('key', self.app.panel_key)
+                    pyautogui.press(key)
                     action_end_time = time.time()
                     action_time = action_end_time - action_start_time
                     log.append(
-                        f"Clicked at position {pos} with modifiers {modifiers} {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+                        f"Pressed panel key '{key}' {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
 
-                # Release modifiers
-                for mod in modifiers:
-                    pyautogui.keyUp(modifier_keys[mod])
-
-            elif action_type == 'return_mouse':
-                pyautogui.moveTo(original_position[0], original_position[1], duration=self.app.mouse_move_duration)
-                action_end_time = time.time()
-                action_time = action_end_time - action_start_time
-                log.append(
-                    f"Mouse returned to original position {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
-                click_after_return = action.get('click_after_return', False)
-                if click_after_return:
-                    pyautogui.click()
-                    action_end_time = time.time()
-                    action_time = action_end_time - action_start_time
-                    log.append(
-                        f"Clicked after returning to original position {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
-
-            elif action_type == 'wait':
-                duration = action.get('duration', self.app.action_registration_time())
-                if isinstance(duration, str):
-                    duration = self.app.wait_times.get(duration, self.app.action_registration_time())
-                time.sleep(duration)
-                action_end_time = time.time()
-                action_time = action_end_time - action_start_time
-                log.append(
-                    f"Waited for {duration} seconds {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
-
-            elif action_type == 'run_macro':
-                macro_name = action.get('macro_name')
-                sub_macro = next((m for m in self.app.macro_list_data if m.name == macro_name), None)
-                if sub_macro:
-                    if sub_macro == self:
-                        log.append(f"Cannot run macro '{macro_name}' recursively.")
+                elif action_type == 'press_specific_panel_key':
+                    panel = action.get('panel')
+                    if panel == 'Custom':
+                        key = action.get('custom_key')
                     else:
-                        # Create a local state for the subroutine
-                        sub_local_state = {
-                            'call_count': 0,
-                            'current_position_index': 0
+                        specific_panel_keys = {
+                            'Inventory': self.app.inventory_key,
+                            'Prayer': self.app.prayer_key,
+                            'Spells': self.app.spells_key
                         }
-                        sub_macro.run_actions(sub_macro.actions, original_position, log, local_dose_count=sub_macro.is_dose_macro, local_state=sub_local_state)
+                        key = specific_panel_keys.get(panel)
+                    pyautogui.press(key)
+                    action_end_time = time.time()
+                    action_time = action_end_time - action_start_time
+                    log.append(
+                        f"Pressed specific panel key '{key}' for panel '{panel}' {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+
+                elif action_type == 'click':
+                    positions = action.get('positions', [])
+                    use_saved_target = action.get('use_saved_target', False)
+                    modifiers = action.get('modifiers', [])
+                    modifier_keys = {'Shift': 'shift', 'Ctrl': 'ctrl', 'Alt': 'alt'}
+
+                    # Press down modifiers
+                    for mod in modifiers:
+                        pyautogui.keyDown(modifier_keys[mod])
+
+                    if use_saved_target:
+                        pos = original_position
+                    else:
+                        if self.is_dose_macro:
+                            pos_index = self.current_position_index % len(positions)
+                            pos = positions[pos_index]
+                        else:
+                            pos = positions
+
+                    if isinstance(pos[0], (list, tuple)):
+                        # List of positions
+                        for p in pos:
+                            pyautogui.moveTo(p[0], p[1], duration=self.app.mouse_move_duration)
+                            pyautogui.click()
+                            # Log time for each click
+                            action_end_time = time.time()
+                            action_time = action_end_time - action_start_time
+                            log.append(
+                                f"Clicked at position {p} with modifiers {modifiers} {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+                            action_start_time = time.time()
+                    else:
+                        # Single position
+                        pyautogui.moveTo(pos[0], pos[1], duration=self.app.mouse_move_duration)
+                        pyautogui.click()
                         action_end_time = time.time()
                         action_time = action_end_time - action_start_time
                         log.append(
-                            f"Ran sub-macro '{macro_name}' {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+                            f"Clicked at position {pos} with modifiers {modifiers} {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+
+                    # Release modifiers
+                    for mod in modifiers:
+                        pyautogui.keyUp(modifier_keys[mod])
+
+                elif action_type == 'return_mouse':
+                    pyautogui.moveTo(original_position[0], original_position[1], duration=self.app.mouse_move_duration)
+                    action_end_time = time.time()
+                    action_time = action_end_time - action_start_time
+                    log.append(
+                        f"Mouse returned to original position {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+                    click_after_return = action.get('click_after_return', False)
+                    if click_after_return:
+                        pyautogui.click()
+                        action_end_time = time.time()
+                        action_time = action_end_time - action_start_time
+                        log.append(
+                            f"Clicked after returning to original position {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+
+                elif action_type == 'wait':
+                    duration = action.get('duration', self.app.action_registration_time())
+                    if isinstance(duration, str):
+                        duration = self.app.wait_times.get(duration, self.app.action_registration_time())
+                    time.sleep(duration)
+                    action_end_time = time.time()
+                    action_time = action_end_time - action_start_time
+                    log.append(
+                        f"Waited for {duration} seconds {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+
                 else:
-                    log.append(f"Macro '{macro_name}' not found.")
+                    log.append(f"Unknown action type: {action_type}")
 
-            else:
-                log.append(f"Unknown action type: {action_type}")
+            loop_end_time = time.time()
+            loop_total_time = loop_end_time - loop_start_time
+            total_log.append(f"Loop {self.current_loop_index}/{total_loops} executed in {loop_total_time:.3f} seconds")
+            total_log.extend(log)
 
-            # Handle dose counting
-            if self.is_dose_macro and action_type != 'run_macro':
-                if local_dose_count:
-                    local_state['call_count'] += 1
-                    if local_state['call_count'] % self.dose_count == 0:
-                        local_state['current_position_index'] = (local_state['current_position_index'] + 1) % self.get_total_positions()
-                        log.append(f"Cycled to next position index: {local_state['current_position_index']}")
-                else:
-                    self.call_count += 1
-                    self.app.update_macro_call_count(self)
-                    self.app.config_save_required = True
+            # Update ETA tracker
+            if self.is_loop_macro:
+                loops_remaining = total_loops - self.current_loop_index
+                average_time_per_loop = (loop_end_time - start_time) / self.current_loop_index
+                estimated_time_remaining = loops_remaining * average_time_per_loop
+                self.app.after(0, self.app.update_eta_tracker, estimated_time_remaining)
 
-                    if self.call_count % self.dose_count == 0:
-                        self.current_position_index = (self.current_position_index + 1) % self.get_total_positions()
-                        log.append(f"Cycled to next position index: {self.current_position_index}")
+        end_time = time.time()
+        total_time = end_time - start_time
+
+        self.app.after(0, self.app.log_macro_execution, self.name, total_log, total_time)
+        self.current_loop_index = 0
+        if self.is_loop_macro:
+            self.app.after(0, self.app.reset_eta_tracker)
 
     def get_total_positions(self):
         # Returns the total number of positions for dose counting
@@ -428,6 +381,7 @@ class MacroApp(tk.Tk):
     def register_hotkeys(self):
         self.macro_list_data = self.load_config_macros()
         self.hotkey_manager.register_hotkeys(self.macro_list_data)
+        self.start_scheduled_macros()
 
     def create_widgets(self):
         main_instruction_label = ttk.Label(self,
@@ -508,9 +462,6 @@ class MacroApp(tk.Tk):
 
         edit_macro_btn = ttk.Button(btn_frame, text="Edit Macro", command=self.edit_macro)
         edit_macro_btn.pack(side='left', padx=5)
-
-        copy_macro_btn = ttk.Button(btn_frame, text="Copy Macro", command=self.copy_macro)
-        copy_macro_btn.pack(side='left', padx=5)
 
         del_macro_btn = ttk.Button(btn_frame, text="Delete Macro", command=self.delete_macro)
         del_macro_btn.pack(side='left', padx=5)
@@ -711,34 +662,16 @@ class MacroApp(tk.Tk):
             self.register_hotkeys()
             self.log(f"Macro '{macro_name}' has been deleted.")
 
-    def copy_macro(self):
-        selected_item = self.macro_list.selection()
-        if not selected_item:
-            messagebox.showwarning("No Selection", "Please select a macro to copy.")
-            return
-        values = self.macro_list.item(selected_item, 'values')
-        macro_name = values[0]
-        # Find the corresponding macro in config
-        macro_config = next((m for m in self.config['macros'] if m['name'] == macro_name), None)
-        if not macro_config:
-            messagebox.showerror("Error", "Selected macro not found.")
-            return
-        # Create a deep copy of the macro_config
-        import copy
-        new_macro_config = copy.deepcopy(macro_config)
-        # Modify the name to indicate it's a copy
-        new_macro_config['name'] = macro_name + " Copy"
-        # Open the MacroEditor with this new macro_config
-        MacroEditor(self, new_macro_config, is_copy=True)
-
     def toggle_macros(self):
         self.macros_enabled = not self.macros_enabled
         if self.macros_enabled:
             self.toggle_macros_button.config(text="Disable Macros")
             self.log("Macros enabled.")
+            self.start_scheduled_macros()
         else:
             self.toggle_macros_button.config(text="Enable Macros")
             self.log("Macros disabled via killswitch.")
+            self.stop_scheduled_macros()
 
     def update_macro_call_count(self, macro):
         # Find the macro in the treeview and update its 'Doses' and 'Call Count' columns
@@ -754,6 +687,7 @@ class MacroApp(tk.Tk):
     def register_hotkeys(self):
         self.macro_list_data = self.load_config_macros()
         self.hotkey_manager.register_hotkeys(self.macro_list_data)
+        self.start_scheduled_macros()
 
     def update_eta_tracker(self, estimated_time_remaining):
         minutes, seconds = divmod(int(estimated_time_remaining), 60)
@@ -763,16 +697,23 @@ class MacroApp(tk.Tk):
     def reset_eta_tracker(self):
         self.eta_label.config(text="Estimated Time Remaining: N/A")
 
+    def start_scheduled_macros(self):
+        for macro in self.macro_list_data:
+            macro.start_scheduled_execution()
+
+    def stop_scheduled_macros(self):
+        for macro in self.macro_list_data:
+            macro.stop_scheduled_execution()
+
 
 # MacroEditor Class
 class MacroEditor(tk.Toplevel):
-    def __init__(self, parent, macro_config, is_copy=False):
+    def __init__(self, parent, macro_config):
         super().__init__(parent)
         self.parent = parent
         self.macro_config = macro_config
-        self.is_copy = is_copy
         self.title("Macro Editor")
-        self.geometry("600x700")
+        self.geometry("600x800")
         self.create_widgets()
 
     def create_widgets(self):
@@ -809,22 +750,34 @@ class MacroEditor(tk.Toplevel):
         self.is_loop_macro_check.grid(row=5, column=0, columnspan=3, padx=10, pady=5, sticky='w')
 
         # Number of Loops Entry
-        ttk.Label(self, text="Number of Loops (-1 for infinite):").grid(row=6, column=0, padx=10, pady=5, sticky='e')
+        ttk.Label(self, text="Number of Loops:").grid(row=6, column=0, padx=10, pady=5, sticky='e')
         self.loop_count_entry = ttk.Entry(self, width=10)
         self.loop_count_entry.grid(row=6, column=1, padx=10, pady=5, sticky='w')
         self.loop_count_entry.config(state='disabled')  # Initially disabled
 
+        # Scheduling Macro Checkbox
+        self.is_scheduled_var = tk.BooleanVar(value=False)
+        self.is_scheduled_check = ttk.Checkbutton(self, text="Enable Scheduling", variable=self.is_scheduled_var,
+                                                  command=self.toggle_schedule_interval_entry)
+        self.is_scheduled_check.grid(row=7, column=0, columnspan=3, padx=10, pady=5, sticky='w')
+
+        # Schedule Interval Entry
+        ttk.Label(self, text="Schedule Interval (s):").grid(row=8, column=0, padx=10, pady=5, sticky='e')
+        self.schedule_interval_entry = ttk.Entry(self, width=10)
+        self.schedule_interval_entry.grid(row=8, column=1, padx=10, pady=5, sticky='w')
+        self.schedule_interval_entry.config(state='disabled')  # Initially disabled
+
         # Actions List
-        ttk.Label(self, text="Actions:").grid(row=7, column=0, padx=10, pady=5, sticky='ne')
+        ttk.Label(self, text="Actions:").grid(row=9, column=0, padx=10, pady=5, sticky='ne')
         self.actions_listbox = tk.Listbox(self, height=15, width=50)
-        self.actions_listbox.grid(row=7, column=1, padx=10, pady=5, sticky='w')
+        self.actions_listbox.grid(row=9, column=1, padx=10, pady=5, sticky='w')
 
         # Bind double-click event
         self.actions_listbox.bind('<Double-1>', self.on_action_double_click)
 
         # Buttons for actions
         btn_frame = ttk.Frame(self)
-        btn_frame.grid(row=7, column=2, padx=10, pady=5, sticky='n')
+        btn_frame.grid(row=9, column=2, padx=10, pady=5, sticky='n')
 
         add_action_btn = ttk.Button(btn_frame, text="Add Action", command=self.add_action)
         add_action_btn.pack(side='top', padx=5, pady=2)
@@ -843,7 +796,7 @@ class MacroEditor(tk.Toplevel):
 
         # Save Button
         save_btn = ttk.Button(self, text="Save Macro", command=self.save_macro)
-        save_btn.grid(row=8, column=0, columnspan=3, pady=20)
+        save_btn.grid(row=10, column=0, columnspan=3, pady=20)
 
         self.actions_list = []  # List to store actions
 
@@ -870,6 +823,14 @@ class MacroEditor(tk.Toplevel):
             self.loop_count_entry.delete(0, tk.END)
             self.loop_count_entry.config(state='disabled')
 
+    def toggle_schedule_interval_entry(self):
+        if self.is_scheduled_var.get():
+            self.schedule_interval_entry.config(state='normal')
+            self.schedule_interval_entry.focus()
+        else:
+            self.schedule_interval_entry.delete(0, tk.END)
+            self.schedule_interval_entry.config(state='disabled')
+
     def get_action_description(self, action):
         action_type = action.get('type')
         annotation = action.get('annotation', '')
@@ -893,8 +854,6 @@ class MacroEditor(tk.Toplevel):
                        f" ({annotation})" if annotation else "")
         elif action_type == 'wait':
             return f"Wait for {action.get('duration')} seconds {f'({annotation})' if annotation else ''}"
-        elif action_type == 'run_macro':
-            return f"Run Macro '{action.get('macro_name')}' {f'({annotation})' if annotation else ''}"
         else:
             return "Unknown Action"
 
@@ -909,6 +868,10 @@ class MacroEditor(tk.Toplevel):
             self.is_loop_macro_var.set(True)
             self.loop_count_entry.config(state='normal')
             self.loop_count_entry.insert(0, str(self.macro_config.get('loop_count', 1)))
+        if self.macro_config.get('is_scheduled', False):
+            self.is_scheduled_var.set(True)
+            self.schedule_interval_entry.config(state='normal')
+            self.schedule_interval_entry.insert(0, str(self.macro_config.get('schedule_interval', 0)))
         self.actions_list = self.macro_config.get('actions', [])
         for action in self.actions_list:
             self.actions_listbox.insert('end', self.get_action_description(action))
@@ -969,6 +932,9 @@ class MacroEditor(tk.Toplevel):
         is_loop_macro = self.is_loop_macro_var.get()
         loop_count = None
 
+        is_scheduled = self.is_scheduled_var.get()
+        schedule_interval = None
+
         if is_dose_macro:
             dose_count_str = self.dose_count_entry.get().strip()
             if not dose_count_str.isdigit() or int(dose_count_str) <= 0:
@@ -978,26 +944,28 @@ class MacroEditor(tk.Toplevel):
 
         if is_loop_macro:
             loop_count_str = self.loop_count_entry.get().strip()
+            if not loop_count_str.isdigit() or int(loop_count_str) <= 0:
+                messagebox.showerror("Invalid Input", "Number of Loops must be a positive integer.")
+                return
+            loop_count = int(loop_count_str)
+
+        if is_scheduled:
+            schedule_interval_str = self.schedule_interval_entry.get().strip()
             try:
-                loop_count = int(loop_count_str)
-                if loop_count == -1:
-                    pass  # Infinite loop
-                elif loop_count <= 0:
-                    messagebox.showerror("Invalid Input",
-                                         "Number of Loops must be a positive integer or -1 for infinite looping.")
-                    return
+                schedule_interval = float(schedule_interval_str)
+                if schedule_interval <= 0:
+                    raise ValueError
             except ValueError:
-                messagebox.showerror("Invalid Input",
-                                     "Number of Loops must be a positive integer or -1 for infinite looping.")
+                messagebox.showerror("Invalid Input", "Schedule Interval must be a positive number.")
                 return
 
-        if not name or not hotkey:
+        if not name:
             messagebox.showerror("Missing Information", "Please fill in all the required fields.")
             return
 
         # Check for unique macro name
         existing_names = [m['name'] for m in self.parent.config['macros']]
-        if self.macro_config and not self.is_copy:
+        if self.macro_config:
             # If editing, remove the current macro's name from the list to allow renaming to itself
             existing_names.remove(self.macro_config['name'])
         if name in existing_names:
@@ -1010,7 +978,8 @@ class MacroEditor(tk.Toplevel):
             "hotkey": hotkey,
             "actions": self.actions_list,
             "is_dose_macro": is_dose_macro,
-            "is_loop_macro": is_loop_macro
+            "is_loop_macro": is_loop_macro,
+            "is_scheduled": is_scheduled
         }
 
         if is_dose_macro:
@@ -1028,7 +997,10 @@ class MacroEditor(tk.Toplevel):
         else:
             new_macro["loop_count"] = 1
 
-        if self.macro_config and not self.is_copy:
+        if is_scheduled:
+            new_macro["schedule_interval"] = schedule_interval
+
+        if self.macro_config:
             # Update existing macro
             index = self.parent.config['macros'].index(self.macro_config)
             self.parent.config['macros'][index] = new_macro
@@ -1064,7 +1036,7 @@ class ActionEditor(tk.Toplevel):
     def create_widgets(self):
         # Action Type
         ttk.Label(self, text="Action Type:").grid(row=0, column=0, padx=10, pady=5, sticky='e')
-        self.action_types = ["Press Panel Key", "Press Specific Panel Key", "Click", "Return Mouse", "Wait", "Run Macro"]
+        self.action_types = ["Press Panel Key", "Press Specific Panel Key", "Click", "Return Mouse", "Wait"]
         self.selected_action_type = tk.StringVar()
         self.selected_action_type.set(self.action_types[0])
         self.action_type_menu = ttk.OptionMenu(self, self.selected_action_type, self.action_types[0],
@@ -1161,7 +1133,7 @@ class ActionEditor(tk.Toplevel):
             self.selected_wait_time = tk.StringVar()
             self.selected_wait_time.set(self.wait_time_options[0])
 
-            self.wait_time_menu = ttk.OptionMenu(self.params_frame, self.selected_wait_time, self.selected_wait_time.get(),
+            self.wait_time_menu = ttk.OptionMenu(self.params_frame, self.selected_wait_time, self.wait_time_options[0],
                                                  *self.wait_time_options)
             self.wait_time_menu.grid(row=1, column=1, padx=5, pady=5, sticky='w')
             self.wait_time_menu.grid_remove()
@@ -1171,14 +1143,6 @@ class ActionEditor(tk.Toplevel):
             self.duration_entry.grid(row=1, column=1, padx=5, pady=5)
 
             self.toggle_wait_duration_entry()
-        elif action_type == "Run Macro":
-            ttk.Label(self.params_frame, text="Select Macro:").grid(row=0, column=0, padx=5, pady=5)
-            self.macro_names = [macro['name'] for macro in self.parent.parent.config['macros'] if macro['name'] != self.parent.name_entry.get()]
-            self.selected_macro_name = tk.StringVar()
-            self.selected_macro_name.set(self.macro_names[0] if self.macro_names else "")
-            self.macro_menu = ttk.OptionMenu(self.params_frame, self.selected_macro_name, self.selected_macro_name.get(),
-                                             *self.macro_names)
-            self.macro_menu.grid(row=0, column=1, padx=5, pady=5)
         # No additional parameters for other actions
 
     def toggle_custom_panel_entry(self, *args):
@@ -1226,9 +1190,6 @@ class ActionEditor(tk.Toplevel):
                 self.toggle_wait_duration_entry()
             else:
                 self.duration_entry.insert(0, str(duration))
-        elif action_type == 'run_macro':
-            macro_name = self.action.get('macro_name', '')
-            self.selected_macro_name.set(macro_name)
         # Load annotation
         self.annotation_entry.insert(0, self.action.get('annotation', ''))
 
@@ -1324,15 +1285,6 @@ class ActionEditor(tk.Toplevel):
             action = {
                 'type': 'wait',
                 'duration': duration
-            }
-        elif action_type == "Run Macro":
-            macro_name = self.selected_macro_name.get()
-            if not macro_name:
-                messagebox.showerror("Invalid Input", "Please select a macro to run.")
-                return
-            action = {
-                'type': 'run_macro',
-                'macro_name': macro_name
             }
         else:
             messagebox.showerror("Invalid Action", "Unknown action type.")

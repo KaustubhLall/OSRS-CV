@@ -1,7 +1,7 @@
 {
     "interface_switch_time": 0.1,
-    "action_registration_time_min": 0.075,
-    "action_registration_time_max": 0.075,
+    "action_registration_time_min": 0.02,
+    "action_registration_time_max": 0.02,
     "panel_key": "q",
     "specific_panel_keys": {
         "Inventory": "w",
@@ -10,8 +10,8 @@
     },
     "macros": [
         {
-            "name": "PRAYER FLICK",
-            "hotkey": "b",
+            "name": "prayer - wilderness flick",
+            "hotkey": "n",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
@@ -26,12 +26,12 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1887,
-                            772
+                            1949,
+                            1197
                         ],
                         [
-                            1888,
-                            1183
+                            1936,
+                            835
                         ]
                     ],
                     "modifiers": []
@@ -46,40 +46,30 @@
                 }
             ],
             "is_dose_macro": false,
+            "is_loop_macro": false,
             "call_count": 0,
-            "current_position_index": 0
+            "current_position_index": 0,
+            "loop_count": 1
         },
         {
-            "name": "SUPER RESTORE",
+            "name": "eat - restore",
             "hotkey": "z",
             "actions": [
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Prayer"
-                },
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Inventory"
-                },
                 {
                     "type": "click",
                     "use_saved_target": false,
                     "positions": [
                         [
-                            2110,
-                            836
+                            2050,
+                            1259
                         ],
                         [
-                            2198,
-                            846
+                            2137,
+                            1268
                         ],
                         [
-                            2098,
-                            912
-                        ],
-                        [
-                            2192,
-                            917
+                            2224,
+                            1273
                         ]
                     ],
                     "modifiers": []
@@ -90,20 +80,18 @@
                 }
             ],
             "is_dose_macro": true,
+            "is_loop_macro": false,
             "dose_count": 4,
             "call_count": 0,
-            "current_position_index": 0
+            "current_position_index": 0,
+            "loop_count": 1
         },
         {
-            "name": "PRAYER RANGED",
+            "name": "prayer - ranged",
             "hotkey": "2",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
-                    "panel": "Spells"
-                },
-                {
-                    "type": "press_specific_panel_key",
                     "panel": "Prayer"
                 },
                 {
@@ -111,34 +99,33 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1893,
-                            1011
+                            1932,
+                            1056
                         ]
-                    ]
-                },
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Inventory"
+                    ],
+                    "modifiers": []
                 },
                 {
                     "type": "return_mouse",
                     "click_after_return": false
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
                 }
             ],
             "is_dose_macro": false,
+            "is_loop_macro": false,
             "call_count": 0,
-            "current_position_index": 0
+            "current_position_index": 0,
+            "loop_count": 1
         },
         {
-            "name": "PRAYER MELEE",
+            "name": "prayer - melee",
             "hotkey": "3",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
-                    "panel": "Spells"
-                },
-                {
-                    "type": "press_specific_panel_key",
                     "panel": "Prayer"
                 },
                 {
@@ -146,34 +133,33 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1964,
-                            1016
+                            2011,
+                            1058
                         ]
-                    ]
-                },
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Inventory"
+                    ],
+                    "modifiers": []
                 },
                 {
                     "type": "return_mouse",
                     "click_after_return": false
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
                 }
             ],
             "is_dose_macro": false,
+            "is_loop_macro": false,
             "call_count": 0,
-            "current_position_index": 0
+            "current_position_index": 0,
+            "loop_count": 1
         },
         {
-            "name": "PRAYER MAGE",
+            "name": "prayer - mage",
             "hotkey": "1",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
-                    "panel": "Spells"
-                },
-                {
-                    "type": "press_specific_panel_key",
                     "panel": "Prayer"
                 },
                 {
@@ -181,27 +167,30 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            2047,
-                            1017
+                            2076,
+                            1058
                         ]
-                    ]
-                },
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Inventory"
+                    ],
+                    "modifiers": []
                 },
                 {
                     "type": "return_mouse",
                     "click_after_return": false
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
                 }
             ],
             "is_dose_macro": false,
+            "is_loop_macro": false,
             "call_count": 0,
-            "current_position_index": 0
+            "current_position_index": 0,
+            "loop_count": 1
         },
         {
-            "name": "SPELL BARRAGE",
-            "hotkey": "cc",
+            "name": "spell - ancient - barrage",
+            "hotkey": "ccr",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
@@ -212,10 +201,11 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1902,
-                            981
+                            1944,
+                            1025
                         ]
-                    ]
+                    ],
+                    "modifiers": []
                 },
                 {
                     "type": "return_mouse",
@@ -227,302 +217,13 @@
                 }
             ],
             "is_dose_macro": false,
+            "is_loop_macro": false,
             "call_count": 0,
-            "current_position_index": 0
+            "current_position_index": 0,
+            "loop_count": 1
         },
         {
-            "name": "LOADOUT_SPINDEL",
-            "hotkey": "L",
-            "actions": [
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
-                        [
-                            845,
-                            976
-                        ]
-                    ]
-                },
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
-                        [
-                            523,
-                            246
-                        ],
-                        [
-                            515,
-                            345
-                        ],
-                        [
-                            621,
-                            230
-                        ],
-                        [
-                            626,
-                            302
-                        ],
-                        [
-                            738,
-                            236
-                        ],
-                        [
-                            730,
-                            303
-                        ],
-                        [
-                            851,
-                            236
-                        ],
-                        [
-                            840,
-                            295
-                        ],
-                        [
-                            943,
-                            245
-                        ],
-                        [
-                            946,
-                            323
-                        ],
-                        [
-                            1069,
-                            235
-                        ]
-                    ]
-                },
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
-                        [
-                            402,
-                            62
-                        ],
-                        [
-                            1917,
-                            762
-                        ],
-                        [
-                            2003,
-                            767
-                        ],
-                        [
-                            2110,
-                            764
-                        ],
-                        [
-                            2197,
-                            764
-                        ],
-                        [
-                            1921,
-                            839
-                        ],
-                        [
-                            2010,
-                            844
-                        ],
-                        [
-                            2105,
-                            844
-                        ],
-                        [
-                            2188,
-                            846
-                        ],
-                        [
-                            1914,
-                            927
-                        ],
-                        [
-                            2000,
-                            924
-                        ],
-                        [
-                            2109,
-                            925
-                        ]
-                    ]
-                },
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
-                        [
-                            394,
-                            63
-                        ]
-                    ]
-                },
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
-                        [
-                            511,
-                            404
-                        ],
-                        [
-                            510,
-                            482
-                        ],
-                        [
-                            624,
-                            409
-                        ],
-                        [
-                            616,
-                            479
-                        ],
-                        [
-                            723,
-                            411
-                        ],
-                        [
-                            705,
-                            481
-                        ],
-                        [
-                            835,
-                            409
-                        ],
-                        [
-                            832,
-                            478
-                        ],
-                        [
-                            949,
-                            393
-                        ],
-                        [
-                            935,
-                            471
-                        ],
-                        [
-                            1059,
-                            407
-                        ],
-                        [
-                            1050,
-                            487
-                        ],
-                        [
-                            1167,
-                            400
-                        ],
-                        [
-                            1146,
-                            463
-                        ],
-                        [
-                            1280,
-                            406
-                        ],
-                        [
-                            1286,
-                            474
-                        ],
-                        [
-                            511,
-                            556
-                        ],
-                        [
-                            509,
-                            627
-                        ],
-                        [
-                            623,
-                            562
-                        ],
-                        [
-                            614,
-                            647
-                        ],
-                        [
-                            727,
-                            556
-                        ],
-                        [
-                            704,
-                            646
-                        ],
-                        [
-                            845,
-                            566
-                        ],
-                        [
-                            841,
-                            640
-                        ],
-                        [
-                            949,
-                            565
-                        ],
-                        [
-                            949,
-                            657
-                        ],
-                        [
-                            1041,
-                            555
-                        ],
-                        [
-                            1037,
-                            643
-                        ],
-                        [
-                            948,
-                            988
-                        ],
-                        [
-                            948,
-                            988
-                        ],
-                        [
-                            1056,
-                            559
-                        ],
-                        [
-                            1055,
-                            562
-                        ],
-                        [
-                            1045,
-                            572
-                        ],
-                        [
-                            1059,
-                            558
-                        ],
-                        [
-                            885,
-                            981
-                        ],
-                        [
-                            943,
-                            402
-                        ],
-                        [
-                            946,
-                            486
-                        ],
-                        [
-                            846,
-                            981
-                        ]
-                    ]
-                }
-            ],
-            "is_dose_macro": false,
-            "call_count": 0,
-            "current_position_index": 0
-        },
-        {
-            "name": "PANIC",
+            "name": "panic tele",
             "hotkey": "`",
             "actions": [
                 {
@@ -538,108 +239,42 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1898,
-                            755
+                            1923,
+                            811
                         ]
-                    ]
+                    ],
+                    "modifiers": []
                 }
             ],
             "is_dose_macro": false,
+            "is_loop_macro": false,
             "call_count": 0,
-            "current_position_index": 0
+            "current_position_index": 0,
+            "loop_count": 1
         },
         {
-            "name": "MELEE SPEC",
-            "hotkey": "nHH",
-            "actions": [
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Prayer"
-                },
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
-                        [
-                            2060,
-                            1108
-                        ]
-                    ]
-                },
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
-                        [
-                            1969,
-                            1181
-                        ]
-                    ]
-                },
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Inventory"
-                },
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
-                        [
-                            1909,
-                            835
-                        ]
-                    ]
-                },
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
-                        [
-                            1974,
-                            369
-                        ]
-                    ]
-                },
-                {
-                    "type": "return_mouse",
-                    "click_after_return": false
-                }
-            ],
-            "is_dose_macro": false,
-            "call_count": 0,
-            "current_position_index": 0
-        },
-        {
-            "name": "EAT",
+            "name": "eat - brew",
             "hotkey": "x",
             "actions": [
                 {
-                    "type": "press_specific_panel_key",
-                    "panel": "Prayer"
-                },
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Inventory"
-                },
-                {
                     "type": "click",
                     "use_saved_target": false,
                     "positions": [
                         [
-                            2112,
-                            1006
+                            1952,
+                            1115
                         ],
                         [
-                            2198,
-                            1015
+                            2043,
+                            1128
                         ],
                         [
-                            2106,
-                            1093
+                            2126,
+                            1132
                         ],
                         [
-                            2201,
-                            1086
+                            2219,
+                            1129
                         ]
                     ],
                     "modifiers": []
@@ -650,60 +285,14 @@
                 }
             ],
             "is_dose_macro": true,
+            "is_loop_macro": false,
             "dose_count": 4,
             "call_count": 0,
-            "current_position_index": 0
+            "current_position_index": 0,
+            "loop_count": 1
         },
         {
             "name": "swap1",
-            "hotkey": "f",
-            "actions": [
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Prayer"
-                },
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Inventory"
-                },
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
-                        [
-                            1914,
-                            926
-                        ],
-                        [
-                            1901,
-                            1007
-                        ],
-                        [
-                            1906,
-                            1086
-                        ],
-                        [
-                            2007,
-                            996
-                        ],
-                        [
-                            2006,
-                            933
-                        ]
-                    ],
-                    "modifiers": []
-                },
-                {
-                    "type": "return_mouse",
-                    "click_after_return": false
-                }
-            ],
-            "is_dose_macro": false,
-            "call_count": 0,
-            "current_position_index": 0
-        },
-        {
-            "name": "swap2",
             "hotkey": "d",
             "actions": [
                 {
@@ -719,24 +308,24 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            2013,
-                            1087
+                            1953,
+                            840
                         ],
                         [
-                            1903,
-                            1165
+                            1955,
+                            907
                         ],
                         [
-                            2008,
-                            1169
+                            2044,
+                            829
                         ],
                         [
-                            1916,
-                            1238
+                            2038,
+                            907
                         ],
                         [
-                            2009,
-                            1255
+                            1956,
+                            972
                         ]
                     ],
                     "modifiers": []
@@ -747,11 +336,63 @@
                 }
             ],
             "is_dose_macro": false,
+            "is_loop_macro": false,
             "call_count": 0,
-            "current_position_index": 0
+            "current_position_index": 0,
+            "loop_count": 1
         },
         {
-            "name": "augury/rigour swap",
+            "name": "swap2",
+            "hotkey": "f",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2123,
+                            829
+                        ],
+                        [
+                            2207,
+                            826
+                        ],
+                        [
+                            2126,
+                            899
+                        ],
+                        [
+                            2208,
+                            902
+                        ],
+                        [
+                            2051,
+                            969
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
+        },
+        {
+            "name": "prayer - augury/rigor",
             "hotkey": "4",
             "actions": [
                 {
@@ -783,54 +424,11 @@
                 }
             ],
             "is_dose_macro": true,
+            "is_loop_macro": false,
             "dose_count": 1,
             "call_count": 0,
-            "current_position_index": 0
-        },
-        {
-            "name": "4-way swap",
-            "hotkey": "5",
-            "actions": [
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Spells"
-                },
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Inventory"
-                },
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
-                        [
-                            1915,
-                            837
-                        ],
-                        [
-                            2010,
-                            842
-                        ],
-                        [
-                            1916,
-                            915
-                        ],
-                        [
-                            2009,
-                            923
-                        ]
-                    ],
-                    "modifiers": [],
-                    "annotation": "equipment"
-                },
-                {
-                    "type": "return_mouse",
-                    "click_after_return": false
-                }
-            ],
-            "is_dose_macro": false,
-            "call_count": 0,
-            "current_position_index": 0
+            "current_position_index": 0,
+            "loop_count": 1
         },
         {
             "name": "melee spec",
@@ -845,12 +443,12 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            2056,
-                            1098
+                            2324,
+                            1138
                         ],
                         [
-                            1973,
-                            1175
+                            2254,
+                            1209
                         ]
                     ],
                     "modifiers": [],
@@ -865,16 +463,12 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1915,
-                            835
+                            2207,
+                            976
                         ]
                     ],
-                    "modifiers": []
-                },
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Custom",
-                    "custom_key": "q"
+                    "modifiers": [],
+                    "annotation": "specr"
                 },
                 {
                     "type": "wait",
@@ -885,8 +479,8 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1963,
-                            375
+                            2253,
+                            337
                         ]
                     ],
                     "modifiers": []
@@ -901,12 +495,14 @@
                 }
             ],
             "is_dose_macro": false,
+            "is_loop_macro": false,
             "call_count": 0,
-            "current_position_index": 0
+            "current_position_index": 0,
+            "loop_count": 1
         },
         {
             "name": "SPELL BIND",
-            "hotkey": "c",
+            "hotkey": "b",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
@@ -921,15 +517,15 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1913,
-                            1145
+                            2217,
+                            1059
                         ]
                     ],
                     "modifiers": []
                 },
                 {
                     "type": "return_mouse",
-                    "click_after_return": false
+                    "click_after_return": true
                 },
                 {
                     "type": "press_specific_panel_key",
@@ -937,8 +533,10 @@
                 }
             ],
             "is_dose_macro": false,
+            "is_loop_macro": false,
             "call_count": 0,
-            "current_position_index": 0
+            "current_position_index": 0,
+            "loop_count": 1
         },
         {
             "name": "SPELL TB",
@@ -985,12 +583,12 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1384,
-                            964
+                            1369,
+                            1008
                         ],
                         [
-                            1315,
-                            956
+                            1295,
+                            1013
                         ]
                     ],
                     "modifiers": [],
@@ -1005,64 +603,72 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            517,
-                            237
+                            593,
+                            216
                         ],
                         [
-                            512,
-                            320
+                            582,
+                            285
                         ],
                         [
-                            618,
+                            680,
+                            213
+                        ],
+                        [
+                            675,
+                            293
+                        ],
+                        [
+                            777,
+                            202
+                        ],
+                        [
+                            789,
+                            291
+                        ],
+                        [
+                            873,
+                            217
+                        ],
+                        [
+                            861,
+                            281
+                        ],
+                        [
+                            974,
                             223
                         ],
                         [
-                            620,
-                            320
+                            969,
+                            285
                         ],
                         [
-                            734,
-                            235
+                            975,
+                            1020
                         ],
                         [
-                            716,
-                            320
+                            1063,
+                            213
                         ],
                         [
-                            833,
-                            327
+                            1079,
+                            228
                         ],
                         [
-                            839,
-                            235
+                            1059,
+                            220
                         ],
                         [
-                            936,
-                            334
+                            1063,
+                            211
                         ],
                         [
-                            933,
-                            232
+                            875,
+                            1032
                         ],
                         [
-                            961,
-                            979
-                        ],
-                        [
-                            1051,
-                            237
-                        ],
-                        [
-                            1049,
-                            232
-                        ],
-                        [
-                            1061,
-                            237
-                        ],
-                        [
-                            847,
-                            977
+                            477,
+                            60
                         ]
                     ],
                     "modifiers": [],
@@ -1077,215 +683,172 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            394,
-                            75
+                            1945,
+                            830
                         ],
                         [
-                            1924,
-                            766
+                            1953,
+                            901
                         ],
                         [
-                            1916,
-                            847
+                            1959,
+                            966
                         ],
                         [
-                            1907,
-                            925
+                            2063,
+                            994
                         ],
                         [
-                            2016,
-                            762
+                            2045,
+                            906
                         ],
                         [
-                            2012,
-                            831
+                            2046,
+                            839
                         ],
                         [
-                            2010,
-                            926
+                            2134,
+                            842
                         ],
                         [
-                            2099,
-                            755
+                            2117,
+                            905
                         ],
                         [
-                            2198,
-                            767
+                            2124,
+                            974
                         ],
                         [
-                            2103,
-                            834
+                            2206,
+                            907
                         ],
                         [
                             2194,
-                            844
+                            832
                         ],
                         [
-                            2106,
-                            916
-                        ],
-                        [
-                            401,
-                            71
+                            477,
+                            56
                         ]
                     ],
                     "modifiers": [],
-                    "annotation": "equip loadout"
+                    "annotation": "equip"
                 },
                 {
                     "type": "click",
                     "use_saved_target": false,
                     "positions": [
                         [
-                            512,
-                            393
+                            592,
+                            365
                         ],
                         [
-                            515,
-                            493
+                            579,
+                            428
                         ],
                         [
-                            636,
-                            395
+                            692,
+                            368
                         ],
                         [
-                            619,
-                            484
+                            678,
+                            442
                         ],
                         [
-                            735,
-                            407
+                            778,
+                            369
                         ],
                         [
-                            727,
-                            465
+                            786,
+                            433
                         ],
                         [
-                            843,
-                            394
+                            865,
+                            363
                         ],
                         [
-                            836,
-                            476
+                            869,
+                            442
                         ],
                         [
-                            950,
-                            400
+                            974,
+                            364
                         ],
                         [
-                            927,
-                            474
+                            977,
+                            425
                         ],
                         [
-                            1062,
-                            408
+                            1063,
+                            362
                         ],
                         [
-                            1059,
-                            480
+                            1056,
+                            448
                         ],
                         [
-                            1173,
-                            403
+                            1153,
+                            344
                         ],
                         [
                             1154,
-                            475
+                            423
                         ],
                         [
-                            1261,
-                            402
+                            1259,
+                            356
                         ],
                         [
-                            1260,
-                            485
+                            1254,
+                            421
                         ],
                         [
-                            516,
+                            597,
+                            512
+                        ],
+                        [
+                            589,
                             571
                         ],
                         [
-                            526,
-                            648
+                            684,
+                            500
                         ],
                         [
-                            644,
-                            567
+                            689,
+                            587
                         ],
                         [
-                            622,
-                            663
+                            772,
+                            509
                         ],
                         [
-                            736,
-                            563
-                        ],
-                        [
-                            736,
-                            629
-                        ],
-                        [
-                            837,
-                            571
-                        ],
-                        [
-                            826,
-                            645
-                        ],
-                        [
-                            943,
+                            775,
                             570
                         ],
                         [
-                            945,
-                            642
+                            878,
+                            493
                         ],
                         [
-                            1049,
-                            564
+                            873,
+                            575
                         ],
                         [
-                            1051,
-                            640
-                        ]
-                    ],
-                    "modifiers": []
-                }
-            ],
-            "is_dose_macro": false,
-            "call_count": 0,
-            "current_position_index": 0
-        },
-        {
-            "name": "do a thing",
-            "hotkey": "a",
-            "actions": [
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Spells"
-                },
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
+                            967,
+                            498
+                        ],
                         [
-                            1956,
-                            864
-                        ]
-                    ],
-                    "modifiers": []
-                },
-                {
-                    "type": "wait",
-                    "duration": 0.6
-                },
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
+                            969,
+                            571
+                        ],
                         [
-                            2112,
-                            1250
+                            1068,
+                            499
+                        ],
+                        [
+                            1062,
+                            571
                         ]
                     ],
                     "modifiers": []
@@ -1296,7 +859,343 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1
+        },
+        {
+            "name": "clean herb",
+            "hotkey": ",",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1927,
+                            923
+                        ],
+                        [
+                            2005,
+                            915
+                        ],
+                        [
+                            2112,
+                            918
+                        ],
+                        [
+                            2204,
+                            923
+                        ],
+                        [
+                            1916,
+                            1020
+                        ],
+                        [
+                            2020,
+                            987
+                        ],
+                        [
+                            2006,
+                            1000
+                        ],
+                        [
+                            2122,
+                            1019
+                        ],
+                        [
+                            2185,
+                            1003
+                        ],
+                        [
+                            1906,
+                            1080
+                        ],
+                        [
+                            2005,
+                            1081
+                        ],
+                        [
+                            2109,
+                            1086
+                        ],
+                        [
+                            2217,
+                            1086
+                        ],
+                        [
+                            1896,
+                            1172
+                        ],
+                        [
+                            2010,
+                            1179
+                        ],
+                        [
+                            2117,
+                            1170
+                        ],
+                        [
+                            2201,
+                            1175
+                        ],
+                        [
+                            1927,
+                            1247
+                        ],
+                        [
+                            2021,
+                            1252
+                        ],
+                        [
+                            2116,
+                            1247
+                        ],
+                        [
+                            2203,
+                            1251
+                        ],
+                        [
+                            1913,
+                            846
+                        ],
+                        [
+                            2018,
+                            843
+                        ],
+                        [
+                            2112,
+                            852
+                        ],
+                        [
+                            2199,
+                            844
+                        ]
+                    ],
+                    "modifiers": []
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
+        },
+        {
+            "name": "spell - crumble undead",
+            "hotkey": "c",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2235,
+                            1252
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
+        },
+        {
+            "name": "new",
+            "hotkey": "a",
+            "actions": [
+                {
+                    "type": "run_macro",
+                    "macro_name": "nmz - overload"
+                },
+                {
+                    "type": "wait",
+                    "duration": "tick_time"
+                },
+                {
+                    "type": "run_macro",
+                    "macro_name": "nmz - absorption"
+                },
+                {
+                    "type": "wait",
+                    "duration": "tick_time"
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": true,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 5
+        },
+        {
+            "name": "nmz - overload",
+            "hotkey": "xxx",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2033,
+                            841
+                        ],
+                        [
+                            2122,
+                            835
+                        ],
+                        [
+                            2207,
+                            843
+                        ],
+                        [
+                            1954,
+                            915
+                        ],
+                        [
+                            2037,
+                            915
+                        ],
+                        [
+                            2125,
+                            915
+                        ],
+                        [
+                            2202,
+                            904
+                        ]
+                    ],
+                    "modifiers": []
+                }
+            ],
+            "is_dose_macro": true,
+            "is_loop_macro": false,
+            "dose_count": 4,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
+        },
+        {
+            "name": "nmz - absorption",
+            "hotkey": "xxx",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1963,
+                            980
+                        ],
+                        [
+                            2043,
+                            967
+                        ],
+                        [
+                            2133,
+                            985
+                        ],
+                        [
+                            2222,
+                            988
+                        ],
+                        [
+                            1964,
+                            1058
+                        ],
+                        [
+                            2045,
+                            1060
+                        ],
+                        [
+                            2138,
+                            1055
+                        ],
+                        [
+                            2199,
+                            1046
+                        ],
+                        [
+                            1953,
+                            1122
+                        ],
+                        [
+                            2059,
+                            1145
+                        ],
+                        [
+                            2137,
+                            1126
+                        ],
+                        [
+                            2215,
+                            1130
+                        ],
+                        [
+                            1962,
+                            1199
+                        ],
+                        [
+                            2043,
+                            1206
+                        ],
+                        [
+                            2127,
+                            1202
+                        ],
+                        [
+                            2203,
+                            1207
+                        ]
+                    ],
+                    "modifiers": []
+                }
+            ],
+            "is_dose_macro": true,
+            "is_loop_macro": false,
+            "dose_count": 4,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
         }
     ],
-    "mouse_move_duration": 0.05
+    "mouse_move_duration": 0.01,
+    "wait_times": {
+        "tick_time": 0.6
+    }
 }

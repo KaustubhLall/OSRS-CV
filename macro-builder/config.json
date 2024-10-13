@@ -1021,24 +1021,16 @@
             "loop_count": 1
         },
         {
-            "name": "new",
+            "name": "nwe",
             "hotkey": "a",
             "actions": [
                 {
                     "type": "run_macro",
-                    "macro_name": "nmz - overload"
-                },
-                {
-                    "type": "wait",
-                    "duration": "tick_time"
+                    "macro_name": "eat - restore"
                 },
                 {
                     "type": "run_macro",
-                    "macro_name": "nmz - absorption"
-                },
-                {
-                    "type": "wait",
-                    "duration": "tick_time"
+                    "macro_name": "eat - brew"
                 }
             ],
             "is_dose_macro": false,
@@ -1046,152 +1038,6 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 5
-        },
-        {
-            "name": "nmz - overload",
-            "hotkey": "xxx",
-            "actions": [
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Spells"
-                },
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Inventory"
-                },
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
-                        [
-                            2033,
-                            841
-                        ],
-                        [
-                            2122,
-                            835
-                        ],
-                        [
-                            2207,
-                            843
-                        ],
-                        [
-                            1954,
-                            915
-                        ],
-                        [
-                            2037,
-                            915
-                        ],
-                        [
-                            2125,
-                            915
-                        ],
-                        [
-                            2202,
-                            904
-                        ]
-                    ],
-                    "modifiers": []
-                }
-            ],
-            "is_dose_macro": true,
-            "is_loop_macro": false,
-            "dose_count": 4,
-            "call_count": 0,
-            "current_position_index": 0,
-            "loop_count": 1
-        },
-        {
-            "name": "nmz - absorption",
-            "hotkey": "xxx",
-            "actions": [
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Spells"
-                },
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Inventory"
-                },
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
-                        [
-                            1963,
-                            980
-                        ],
-                        [
-                            2043,
-                            967
-                        ],
-                        [
-                            2133,
-                            985
-                        ],
-                        [
-                            2222,
-                            988
-                        ],
-                        [
-                            1964,
-                            1058
-                        ],
-                        [
-                            2045,
-                            1060
-                        ],
-                        [
-                            2138,
-                            1055
-                        ],
-                        [
-                            2199,
-                            1046
-                        ],
-                        [
-                            1953,
-                            1122
-                        ],
-                        [
-                            2059,
-                            1145
-                        ],
-                        [
-                            2137,
-                            1126
-                        ],
-                        [
-                            2215,
-                            1130
-                        ],
-                        [
-                            1962,
-                            1199
-                        ],
-                        [
-                            2043,
-                            1206
-                        ],
-                        [
-                            2127,
-                            1202
-                        ],
-                        [
-                            2203,
-                            1207
-                        ]
-                    ],
-                    "modifiers": []
-                }
-            ],
-            "is_dose_macro": true,
-            "is_loop_macro": false,
-            "dose_count": 4,
-            "call_count": 0,
-            "current_position_index": 0,
-            "loop_count": 1
         }
     ],
     "mouse_move_duration": 0.01,

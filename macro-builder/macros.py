@@ -94,17 +94,17 @@ class Macro:
         self.app = app
 
         self.running = False  # Flag to indicate if the macro is running
-        self.should_stop = False  # Flag to signal the macro to stop
+        self.context = None  # Execution context for shared state
 
     def toggle(self):
         if not self.running:
-            self.should_stop = False
             self.execute()
         else:
             self.stop()
 
     def stop(self):
-        self.should_stop = True
+        if self.context:
+            self.context['should_stop'] = True
 
     def execute(self, threaded=True):
         if threaded:
@@ -129,8 +129,17 @@ class Macro:
             start_time = time.time()
             total_log = []
 
+            # Initialize execution context
+            if not self.context:
+                self.context = {'should_stop': False}
+
+            # Initialize local state for this macro
+            if not hasattr(self, 'local_state'):
+                self.local_state = {'call_count': self.call_count,
+                                    'current_position_index': self.current_position_index}
+
             while infinite_loop or self.current_loop_index < total_loops:
-                if self.should_stop:
+                if self.context['should_stop']:
                     break
                 if not self.app.macros_enabled:
                     break
@@ -143,11 +152,12 @@ class Macro:
                 log.append(f"Original mouse position: {original_position}")
 
                 # Run actions with dose counting
-                self.run_actions(self.actions, original_position, log, local_dose_count=False)
+                self.run_actions(self.actions, original_position, log, self.context, local_state=self.local_state)
 
                 loop_end_time = time.time()
                 loop_total_time = loop_end_time - loop_start_time
-                total_log.append(f"Loop {self.current_loop_index}/{total_loops} executed in {loop_total_time:.3f} seconds")
+                total_log.append(
+                    f"Loop {self.current_loop_index}/{total_loops} executed in {loop_total_time:.3f} seconds")
                 total_log.extend(log)
 
                 # Update ETA tracker
@@ -164,18 +174,21 @@ class Macro:
             self.current_loop_index = 0
             if self.is_loop_macro:
                 self.app.after(0, self.app.reset_eta_tracker)
+
+            # Update the macro's global call count and position index after execution
+            if self.is_dose_macro:
+                self.call_count = self.local_state['call_count']
+                self.current_position_index = self.local_state['current_position_index']
+                self.app.update_macro_call_count(self)
+                self.app.config_save_required = True
         finally:
             self.running = False
+            self.context = None  # Clear the context after execution
+            self.local_state = None  # Clear local state
 
-    def run_actions(self, actions, original_position, log, local_dose_count=False, local_state=None):
-        if local_state is None:
-            local_state = {
-                'call_count': 0,
-                'current_position_index': 0
-            }
-
+    def run_actions(self, actions, original_position, log, context, local_state):
         for action in actions:
-            if self.should_stop:
+            if context['should_stop']:
                 break
 
             action_type = action.get('type')
@@ -221,10 +234,7 @@ class Macro:
                     pos = original_position
                 else:
                     if self.is_dose_macro:
-                        if local_dose_count:
-                            pos_index = local_state['current_position_index'] % len(positions)
-                        else:
-                            pos_index = self.current_position_index % len(positions)
+                        pos_index = local_state['current_position_index'] % len(positions)
                         pos = positions[pos_index]
                     else:
                         pos = positions
@@ -252,6 +262,14 @@ class Macro:
                 # Release modifiers
                 for mod in modifiers:
                     pyautogui.keyUp(modifier_keys[mod])
+
+                # Handle dose counting for click actions
+                if self.is_dose_macro:
+                    local_state['call_count'] += 1
+                    if local_state['call_count'] % self.dose_count == 0:
+                        local_state['current_position_index'] = (local_state[
+                                                                     'current_position_index'] + 1) % self.get_total_positions()
+                        log.append(f"Cycled to next position index: {local_state['current_position_index']}")
 
             elif action_type == 'return_mouse':
                 pyautogui.moveTo(original_position[0], original_position[1], duration=self.app.mouse_move_duration)
@@ -284,12 +302,12 @@ class Macro:
                     if sub_macro == self:
                         log.append(f"Cannot run macro '{macro_name}' recursively.")
                     else:
-                        # Create a local state for the subroutine
-                        sub_local_state = {
-                            'call_count': 0,
-                            'current_position_index': 0
-                        }
-                        sub_macro.run_actions(sub_macro.actions, original_position, log, local_dose_count=sub_macro.is_dose_macro, local_state=sub_local_state)
+                        # Initialize local state for sub_macro if not already done
+                        if not hasattr(sub_macro, 'local_state'):
+                            sub_macro.local_state = {'call_count': 0, 'current_position_index': 0}
+
+                        sub_macro.run_actions(sub_macro.actions, original_position, log, context,
+                                              local_state=sub_macro.local_state)
                         action_end_time = time.time()
                         action_time = action_end_time - action_start_time
                         log.append(
@@ -299,22 +317,6 @@ class Macro:
 
             else:
                 log.append(f"Unknown action type: {action_type}")
-
-            # Handle dose counting
-            if self.is_dose_macro and action_type != 'run_macro':
-                if local_dose_count:
-                    local_state['call_count'] += 1
-                    if local_state['call_count'] % self.dose_count == 0:
-                        local_state['current_position_index'] = (local_state['current_position_index'] + 1) % self.get_total_positions()
-                        log.append(f"Cycled to next position index: {local_state['current_position_index']}")
-                else:
-                    self.call_count += 1
-                    self.app.update_macro_call_count(self)
-                    self.app.config_save_required = True
-
-                    if self.call_count % self.dose_count == 0:
-                        self.current_position_index = (self.current_position_index + 1) % self.get_total_positions()
-                        log.append(f"Cycled to next position index: {self.current_position_index}")
 
     def get_total_positions(self):
         # Returns the total number of positions for dose counting
@@ -332,6 +334,15 @@ class Macro:
             self.app.update_macro_call_count(self)
         self.app.log(f"Call count for macro '{self.name}' has been reset.")
         self.app.config_save_required = True
+
+
+# Functions to load macros
+def load_macros(app):
+    macros = []
+    for macro_config in app.config["macros"]:
+        macro = Macro(macro_config, app)
+        macros.append(macro)
+    return macros
 
 
 # Functions to load macros
@@ -890,7 +901,7 @@ class MacroEditor(tk.Toplevel):
         elif action_type == 'return_mouse':
             return "Return Mouse to Original Position" + (
                 " and Click" if action.get('click_after_return', False) else "") + (
-                       f" ({annotation})" if annotation else "")
+                f" ({annotation})" if annotation else "")
         elif action_type == 'wait':
             return f"Wait for {action.get('duration')} seconds {f'({annotation})' if annotation else ''}"
         elif action_type == 'run_macro':
@@ -1064,7 +1075,8 @@ class ActionEditor(tk.Toplevel):
     def create_widgets(self):
         # Action Type
         ttk.Label(self, text="Action Type:").grid(row=0, column=0, padx=10, pady=5, sticky='e')
-        self.action_types = ["Press Panel Key", "Press Specific Panel Key", "Click", "Return Mouse", "Wait", "Run Macro"]
+        self.action_types = ["Press Panel Key", "Press Specific Panel Key", "Click", "Return Mouse", "Wait",
+                             "Run Macro"]
         self.selected_action_type = tk.StringVar()
         self.selected_action_type.set(self.action_types[0])
         self.action_type_menu = ttk.OptionMenu(self, self.selected_action_type, self.action_types[0],
@@ -1161,7 +1173,8 @@ class ActionEditor(tk.Toplevel):
             self.selected_wait_time = tk.StringVar()
             self.selected_wait_time.set(self.wait_time_options[0])
 
-            self.wait_time_menu = ttk.OptionMenu(self.params_frame, self.selected_wait_time, self.selected_wait_time.get(),
+            self.wait_time_menu = ttk.OptionMenu(self.params_frame, self.selected_wait_time,
+                                                 self.selected_wait_time.get(),
                                                  *self.wait_time_options)
             self.wait_time_menu.grid(row=1, column=1, padx=5, pady=5, sticky='w')
             self.wait_time_menu.grid_remove()
@@ -1173,10 +1186,12 @@ class ActionEditor(tk.Toplevel):
             self.toggle_wait_duration_entry()
         elif action_type == "Run Macro":
             ttk.Label(self.params_frame, text="Select Macro:").grid(row=0, column=0, padx=5, pady=5)
-            self.macro_names = [macro['name'] for macro in self.parent.parent.config['macros'] if macro['name'] != self.parent.name_entry.get()]
+            self.macro_names = [macro['name'] for macro in self.parent.parent.config['macros'] if
+                                macro['name'] != self.parent.name_entry.get()]
             self.selected_macro_name = tk.StringVar()
             self.selected_macro_name.set(self.macro_names[0] if self.macro_names else "")
-            self.macro_menu = ttk.OptionMenu(self.params_frame, self.selected_macro_name, self.selected_macro_name.get(),
+            self.macro_menu = ttk.OptionMenu(self.params_frame, self.selected_macro_name,
+                                             self.selected_macro_name.get(),
                                              *self.macro_names)
             self.macro_menu.grid(row=0, column=1, padx=5, pady=5)
         # No additional parameters for other actions

@@ -134,7 +134,7 @@ class Macro:
                 self.context = {'should_stop': False}
 
             # Initialize local state for this macro
-            if not hasattr(self, 'local_state'):
+            if not hasattr(self, 'local_state') or self.local_state is None:
                 self.local_state = {'call_count': self.call_count,
                                     'current_position_index': self.current_position_index}
 
@@ -186,7 +186,11 @@ class Macro:
             self.context = None  # Clear the context after execution
             self.local_state = None  # Clear local state
 
-    def run_actions(self, actions, original_position, log, context, local_state):
+    def run_actions(self, actions, original_position, log, context, local_state=None):
+        if local_state is None:
+            local_state = {'call_count': self.call_count,
+                           'current_position_index': self.current_position_index}
+
         for action in actions:
             if context['should_stop']:
                 break
@@ -225,6 +229,10 @@ class Macro:
                 use_saved_target = action.get('use_saved_target', False)
                 modifiers = action.get('modifiers', [])
                 modifier_keys = {'Shift': 'shift', 'Ctrl': 'ctrl', 'Alt': 'alt'}
+
+                if not positions and not use_saved_target:
+                    log.append("Error: No positions specified for click action.")
+                    continue
 
                 # Press down modifiers
                 for mod in modifiers:
@@ -267,8 +275,7 @@ class Macro:
                 if self.is_dose_macro:
                     local_state['call_count'] += 1
                     if local_state['call_count'] % self.dose_count == 0:
-                        local_state['current_position_index'] = (local_state[
-                                                                     'current_position_index'] + 1) % self.get_total_positions()
+                        local_state['current_position_index'] = (local_state['current_position_index'] + 1) % self.get_total_positions()
                         log.append(f"Cycled to next position index: {local_state['current_position_index']}")
 
             elif action_type == 'return_mouse':
@@ -303,8 +310,9 @@ class Macro:
                         log.append(f"Cannot run macro '{macro_name}' recursively.")
                     else:
                         # Initialize local state for sub_macro if not already done
-                        if not hasattr(sub_macro, 'local_state'):
-                            sub_macro.local_state = {'call_count': 0, 'current_position_index': 0}
+                        if getattr(sub_macro, 'local_state', None) is None:
+                            sub_macro.local_state = {'call_count': sub_macro.call_count,
+                                                     'current_position_index': sub_macro.current_position_index}
 
                         sub_macro.run_actions(sub_macro.actions, original_position, log, context,
                                               local_state=sub_macro.local_state)
@@ -334,15 +342,6 @@ class Macro:
             self.app.update_macro_call_count(self)
         self.app.log(f"Call count for macro '{self.name}' has been reset.")
         self.app.config_save_required = True
-
-
-# Functions to load macros
-def load_macros(app):
-    macros = []
-    for macro_config in app.config["macros"]:
-        macro = Macro(macro_config, app)
-        macros.append(macro)
-    return macros
 
 
 # Functions to load macros
@@ -386,7 +385,7 @@ class MacroApp(tk.Tk):
         # Initialize macros
         self.initialize_macros()
 
-        # Set pyautogui pause to 0 to eliminate default delay
+        # Set pyautogui pause to 0.025 to eliminate default delay
         pyautogui.PAUSE = 0.025
 
         self.create_widgets()
@@ -761,10 +760,6 @@ class MacroApp(tk.Tk):
                 reset_text = 'Reset' if macro.is_dose_macro else ""
                 self.macro_list.item(item, values=(macro.name, macro.hotkey, doses, call_count, reset_text))
                 break
-
-    def register_hotkeys(self):
-        self.macro_list_data = self.load_config_macros()
-        self.hotkey_manager.register_hotkeys(self.macro_list_data)
 
     def update_eta_tracker(self, estimated_time_remaining):
         minutes, seconds = divmod(int(estimated_time_remaining), 60)

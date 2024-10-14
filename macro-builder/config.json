@@ -60,16 +60,16 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            2050,
-                            1259
+                            1962,
+                            1253
                         ],
                         [
-                            2137,
+                            2042,
                             1268
                         ],
                         [
-                            2224,
-                            1273
+                            2133,
+                            1269
                         ]
                     ],
                     "modifiers": []
@@ -261,20 +261,48 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1952,
-                            1115
+                            1954,
+                            1125
                         ],
                         [
-                            2043,
-                            1128
+                            2041,
+                            1124
                         ],
                         [
-                            2126,
-                            1132
+                            2132,
+                            1130
                         ],
                         [
-                            2219,
-                            1129
+                            1958,
+                            1200
+                        ],
+                        [
+                            2053,
+                            1207
+                        ],
+                        [
+                            2134,
+                            1203
+                        ],
+                        [
+                            2139,
+                            1053
+                        ],
+                        [
+                            2202,
+                            1044
+                        ],
+                        [
+                            2210,
+                            1116
+                        ],
+                        [
+                            2215,
+                            1192
+                        ],
+                        [
+                            2211,
+                            1261
                         ]
                     ],
                     "modifiers": []
@@ -443,12 +471,12 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            2324,
-                            1138
+                            2085,
+                            1135
                         ],
                         [
-                            2254,
-                            1209
+                            2011,
+                            1206
                         ]
                     ],
                     "modifiers": [],
@@ -463,8 +491,8 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            2207,
-                            976
+                            2137,
+                            970
                         ]
                     ],
                     "modifiers": [],
@@ -479,15 +507,11 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            2253,
-                            337
+                            2001,
+                            331
                         ]
                     ],
                     "modifiers": []
-                },
-                {
-                    "type": "press_specific_panel_key",
-                    "panel": "Inventory"
                 },
                 {
                     "type": "return_mouse",
@@ -877,104 +901,100 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1927,
-                            923
+                            1958,
+                            910
                         ],
                         [
-                            2005,
-                            915
+                            2036,
+                            897
                         ],
                         [
-                            2112,
-                            918
+                            2110,
+                            894
                         ],
                         [
-                            2204,
-                            923
+                            2212,
+                            905
                         ],
                         [
-                            1916,
-                            1020
+                            1955,
+                            979
                         ],
                         [
-                            2020,
-                            987
-                        ],
-                        [
-                            2006,
-                            1000
-                        ],
-                        [
-                            2122,
-                            1019
-                        ],
-                        [
-                            2185,
-                            1003
-                        ],
-                        [
-                            1906,
-                            1080
-                        ],
-                        [
-                            2005,
-                            1081
-                        ],
-                        [
-                            2109,
-                            1086
-                        ],
-                        [
-                            2217,
-                            1086
-                        ],
-                        [
-                            1896,
-                            1172
-                        ],
-                        [
-                            2010,
-                            1179
-                        ],
-                        [
-                            2117,
-                            1170
-                        ],
-                        [
-                            2201,
-                            1175
-                        ],
-                        [
-                            1927,
-                            1247
-                        ],
-                        [
-                            2021,
-                            1252
+                            2034,
+                            982
                         ],
                         [
                             2116,
-                            1247
+                            977
                         ],
                         [
-                            2203,
+                            2197,
+                            980
+                        ],
+                        [
+                            1958,
+                            1047
+                        ],
+                        [
+                            2039,
+                            1049
+                        ],
+                        [
+                            2125,
+                            1045
+                        ],
+                        [
+                            2202,
+                            1053
+                        ],
+                        [
+                            1953,
+                            1127
+                        ],
+                        [
+                            2047,
+                            1117
+                        ],
+                        [
+                            2132,
+                            1120
+                        ],
+                        [
+                            2209,
+                            1124
+                        ],
+                        [
+                            1956,
+                            1189
+                        ],
+                        [
+                            2034,
+                            1187
+                        ],
+                        [
+                            2136,
+                            1199
+                        ],
+                        [
+                            2205,
+                            1196
+                        ],
+                        [
+                            1947,
                             1251
                         ],
                         [
-                            1913,
-                            846
+                            2029,
+                            1255
                         ],
                         [
-                            2018,
-                            843
+                            2132,
+                            1267
                         ],
                         [
-                            2112,
-                            852
-                        ],
-                        [
-                            2199,
-                            844
+                            2195,
+                            1250
                         ]
                     ],
                     "modifiers": []
@@ -988,7 +1008,7 @@
         },
         {
             "name": "spell - crumble undead",
-            "hotkey": "c",
+            "hotkey": "ccc",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
@@ -999,8 +1019,8 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            2235,
-                            1252
+                            1940,
+                            1099
                         ]
                     ],
                     "modifiers": []
@@ -1038,6 +1058,44 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 5
+        },
+        {
+            "name": "spell - fire surge",
+            "hotkey": "c",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1940,
+                            1099
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": true
+                },
+                {
+                    "type": "wait",
+                    "duration": 1.0
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": true,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": -1
         }
     ],
     "mouse_move_duration": 0.01,

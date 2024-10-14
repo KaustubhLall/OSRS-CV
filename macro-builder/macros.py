@@ -7,6 +7,7 @@ import time
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
+from tkinter import scrolledtext
 
 import pyautogui
 from pynput import keyboard
@@ -151,7 +152,7 @@ class Macro:
                 log = []
 
                 original_position = pyautogui.position()
-                log.append(f"Original mouse position: {original_position}")
+                # log.append(f"Original mouse position: {original_position}")
 
                 # Run actions with dose counting
                 self.run_actions(self.actions, original_position, log, self.context, local_state=self.local_state)
@@ -159,7 +160,7 @@ class Macro:
                 loop_end_time = time.time()
                 loop_total_time = loop_end_time - loop_start_time
                 total_log.append(
-                    f"Loop {self.current_loop_index}/{total_loops} executed in {loop_total_time:.3f} seconds")
+                    f"Loop {self.current_loop_index}/{total_loops} executed in {loop_total_time:.3f}s")
                 total_log.extend(log)
 
                 # Update ETA tracker
@@ -207,7 +208,7 @@ class Macro:
                 action_end_time = time.time()
                 action_time = action_end_time - action_start_time
                 log.append(
-                    f"Pressed panel key '{key}' {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+                    f"Pressed panel key '{key}' {f'({annotation})' if annotation else ''} [{action_time:.2f}s]")
 
             elif action_type == 'press_specific_panel_key':
                 panel = action.get('panel')
@@ -224,7 +225,7 @@ class Macro:
                 action_end_time = time.time()
                 action_time = action_end_time - action_start_time
                 log.append(
-                    f"Pressed specific panel key '{key}' for panel '{panel}' {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+                    f"Pressed specific panel key '{key}' for panel '{panel}' {f'({annotation})' if annotation else ''} [{action_time:.2f}s]")
 
             elif action_type == 'click':
                 positions = action.get('positions', [])
@@ -258,7 +259,7 @@ class Macro:
                         action_end_time = time.time()
                         action_time = action_end_time - action_start_time
                         log.append(
-                            f"Clicked at position {p} with modifiers {modifiers} {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+                            f"Clicked at position {p} with modifiers {modifiers} {f'({annotation})' if annotation else ''} [{action_time:.2f}s]")
                         action_start_time = time.time()
                 else:
                     # Single position
@@ -267,7 +268,7 @@ class Macro:
                     action_end_time = time.time()
                     action_time = action_end_time - action_start_time
                     log.append(
-                        f"Clicked at position {pos} with modifiers {modifiers} {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+                        f"Clicked at position {pos} with modifiers {modifiers} {f'({annotation})' if annotation else ''} [{action_time:.2f}s]")
 
                 # Release modifiers
                 for mod in modifiers:
@@ -286,14 +287,14 @@ class Macro:
                 action_end_time = time.time()
                 action_time = action_end_time - action_start_time
                 log.append(
-                    f"Mouse returned to original position {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+                    f"Mouse returned to original position {f'({annotation})' if annotation else ''} [{action_time:.2f}s]")
                 click_after_return = action.get('click_after_return', False)
                 if click_after_return:
                     pyautogui.click()
                     action_end_time = time.time()
                     action_time = action_end_time - action_start_time
                     log.append(
-                        f"Clicked after returning to original position {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+                        f"Clicked after returning to original position {f'({annotation})' if annotation else ''} [{action_time:.2f}s]")
 
             elif action_type == 'wait':
                 duration = action.get('duration', self.app.action_registration_time())
@@ -303,7 +304,7 @@ class Macro:
                 action_end_time = time.time()
                 action_time = action_end_time - action_start_time
                 log.append(
-                    f"Waited for {duration} seconds {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+                    f"Waited for {duration} seconds {f'({annotation})' if annotation else ''} [{action_time:.2f}s]")
 
             elif action_type == 'run_macro':
                 macro_name = action.get('macro_name')
@@ -322,7 +323,7 @@ class Macro:
                         action_end_time = time.time()
                         action_time = action_end_time - action_start_time
                         log.append(
-                            f"Ran sub-macro '{macro_name}' {f'({annotation})' if annotation else ''} (took {action_time:.3f} seconds)")
+                            f"Ran sub-macro '{macro_name}' {f'({annotation})' if annotation else ''} [{action_time:.2f}s]")
                 else:
                     log.append(f"Macro '{macro_name}' not found.")
 
@@ -445,7 +446,7 @@ class MacroApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Python Macro Application")
-        self.geometry("800x900")
+        self.geometry("850x700")
         self.config_load()
 
         # Timing configurations
@@ -540,9 +541,24 @@ class MacroApp(tk.Tk):
         self.hotkey_manager.register_hotkeys(self.macro_list_data)
 
     def create_widgets(self):
-        main_instruction_label = ttk.Label(self,
+        self.style = ttk.Style()
+        self.style.configure('TNotebook.Tab', padding=(12, 8))
+        self.style.configure('TButton', font=('Arial', 10))
+        self.style.configure('Treeview.Heading', font=('Arial', 10, 'bold'))
+        self.style.configure('Treeview', font=('Arial', 10))
+
+        # Toolbar Frame
+        toolbar_frame = ttk.Frame(self)
+        toolbar_frame.pack(side='top', fill='x')
+
+        # Enable/Disable Macros Button
+        self.toggle_macros_button = ttk.Button(toolbar_frame, text="Disable Macros", command=self.toggle_macros)
+        self.toggle_macros_button.pack(side='left', padx=5, pady=5)
+
+        # Main Instruction Label
+        main_instruction_label = ttk.Label(toolbar_frame,
                                            text="Use the 'Macros' tab to add or edit macros. Use the 'Settings' tab to configure timings and panel keys.")
-        main_instruction_label.pack(padx=5, pady=5)
+        main_instruction_label.pack(side='left', padx=5, pady=5)
 
         # Notebook for tabs
         self.notebook = ttk.Notebook(self)
@@ -556,13 +572,17 @@ class MacroApp(tk.Tk):
         self.settings_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.settings_frame, text='Settings')
 
-        # Mouse position label
-        self.mouse_pos_label = ttk.Label(self, text="Mouse Position: (0, 0)")
-        self.mouse_pos_label.pack(side='bottom')
-
         # Log Display
-        self.log_text = tk.Text(self, height=15)
-        self.log_text.pack(expand=True, fill='both', side='bottom')
+        log_frame = ttk.Frame(self)
+        log_frame.pack(side='bottom', fill='x')
+
+        # Log Label
+        log_label = ttk.Label(log_frame, text="Activity Log:")
+        log_label.pack(side='top', anchor='w', padx=5, pady=5)
+
+        # ScrolledText for log display
+        self.log_text = scrolledtext.ScrolledText(log_frame, height=10, wrap='word', font=('Consolas', 10))
+        self.log_text.pack(expand=False, fill='x', padx=5)
         # Configure tags for coloring
         self.log_text.tag_configure('timestamp', foreground='grey')
         self.log_text.tag_configure('macro_name', foreground='blue')
@@ -570,13 +590,17 @@ class MacroApp(tk.Tk):
         self.log_text.tag_configure('error', foreground='red')
         self.log_text.tag_configure('success', foreground='green')
 
-        # Add Enable/Disable Macros button
-        self.toggle_macros_button = ttk.Button(self, text="Disable Macros", command=self.toggle_macros)
-        self.toggle_macros_button.pack(pady=5)
+        # Status Bar Frame
+        status_frame = ttk.Frame(self)
+        status_frame.pack(side='bottom', fill='x')
+
+        # Mouse position label
+        self.mouse_pos_label = ttk.Label(status_frame, text="Mouse Position: (0, 0)")
+        self.mouse_pos_label.pack(side='left', padx=5)
 
         # ETA Label
-        self.eta_label = ttk.Label(self, text="Estimated Time Remaining: N/A")
-        self.eta_label.pack(padx=5, pady=5)
+        self.eta_label = ttk.Label(status_frame, text="Estimated Time Remaining: N/A")
+        self.eta_label.pack(side='right', padx=5)
 
         # Macros tab content
         self.create_macros_tab()
@@ -586,15 +610,14 @@ class MacroApp(tk.Tk):
 
     def create_macros_tab(self):
         # Treeview to display macros
+        columns = ('Name', 'Hotkey', 'Doses', 'Call Count', 'Reset')
         self.macro_list = ttk.Treeview(self.macro_frame,
-                                       columns=('Name', 'Hotkey', 'Doses', 'Call Count', 'Reset'),
-                                       show='headings')
-        self.macro_list.heading('Name', text='Name')
-        self.macro_list.heading('Hotkey', text='Hotkey')
-        self.macro_list.heading('Doses', text='Doses')  # Indicates dose-counting macros
-        self.macro_list.heading('Call Count', text='Call Count')
-        self.macro_list.heading('Reset', text='Reset')
-        self.macro_list.pack(expand=True, fill='both')
+                                       columns=columns,
+                                       show='headings', height=15)
+        for col in columns:
+            self.macro_list.heading(col, text=col)
+            self.macro_list.column(col, width=100, anchor='center')
+        self.macro_list.pack(expand=True, fill='both', padx=5, pady=5)
 
         # Populate the treeview with existing macros
         for macro in self.config['macros']:
@@ -644,88 +667,113 @@ class MacroApp(tk.Tk):
                 self.update_macro_call_count(macro)
 
     def create_settings_tab(self):
+        settings_canvas = tk.Canvas(self.settings_frame)
+        settings_scrollbar = ttk.Scrollbar(self.settings_frame, orient="vertical", command=settings_canvas.yview)
+        settings_scrollable_frame = ttk.Frame(settings_canvas)
+
+        settings_scrollable_frame.bind(
+            "<Configure>",
+            lambda e: settings_canvas.configure(
+                scrollregion=settings_canvas.bbox("all")
+            )
+        )
+
+        settings_canvas.create_window((0, 0), window=settings_scrollable_frame, anchor="nw")
+        settings_canvas.configure(yscrollcommand=settings_scrollbar.set)
+
+        settings_canvas.pack(side="left", fill="both", expand=True)
+        settings_scrollbar.pack(side="right", fill="y")
+
         row = 0
         # Interface Switch Time
-        ttk.Label(self.settings_frame, text="Interface Switch Time (s):").grid(row=row, column=0, sticky='e', padx=5,
-                                                                               pady=5)
-        self.interface_switch_time_entry = ttk.Entry(self.settings_frame)
+        ttk.Label(settings_scrollable_frame, text="Interface Switch Time (s):").grid(row=row, column=0, sticky='e',
+                                                                                     padx=5,
+                                                                                     pady=5)
+        self.interface_switch_time_entry = ttk.Entry(settings_scrollable_frame)
         self.interface_switch_time_entry.insert(0, str(self.interface_switch_time))
         self.interface_switch_time_entry.grid(row=row, column=1, padx=5, pady=5)
         row += 1
 
         # Action Registration Time Min
-        ttk.Label(self.settings_frame, text="Action Registration Time Min (s):").grid(row=row, column=0, sticky='e',
-                                                                                      padx=5, pady=5)
-        self.action_time_min_entry = ttk.Entry(self.settings_frame)
+        ttk.Label(settings_scrollable_frame, text="Action Registration Time Min (s):").grid(row=row, column=0,
+                                                                                            sticky='e',
+                                                                                            padx=5, pady=5)
+        self.action_time_min_entry = ttk.Entry(settings_scrollable_frame)
         self.action_time_min_entry.insert(0, str(self.action_registration_time_min))
         self.action_time_min_entry.grid(row=row, column=1, padx=5, pady=5)
         row += 1
 
         # Action Registration Time Max
-        ttk.Label(self.settings_frame, text="Action Registration Time Max (s):").grid(row=row, column=0, sticky='e',
-                                                                                      padx=5, pady=5)
-        self.action_time_max_entry = ttk.Entry(self.settings_frame)
+        ttk.Label(settings_scrollable_frame, text="Action Registration Time Max (s):").grid(row=row, column=0,
+                                                                                            sticky='e',
+                                                                                            padx=5, pady=5)
+        self.action_time_max_entry = ttk.Entry(settings_scrollable_frame)
         self.action_time_max_entry.insert(0, str(self.action_registration_time_max))
         self.action_time_max_entry.grid(row=row, column=1, padx=5, pady=5)
         row += 1
 
         # Mouse Move Duration
-        ttk.Label(self.settings_frame, text="Mouse Move Duration (s):").grid(row=row, column=0, sticky='e', padx=5,
-                                                                             pady=5)
-        self.mouse_move_duration_entry = ttk.Entry(self.settings_frame)
+        ttk.Label(settings_scrollable_frame, text="Mouse Move Duration (s):").grid(row=row, column=0, sticky='e',
+                                                                                   padx=5,
+                                                                                   pady=5)
+        self.mouse_move_duration_entry = ttk.Entry(settings_scrollable_frame)
         self.mouse_move_duration_entry.insert(0, str(self.mouse_move_duration))
         self.mouse_move_duration_entry.grid(row=row, column=1, padx=5, pady=5)
         row += 1
 
         # Delay Between Tasks
-        ttk.Label(self.settings_frame, text="Delay Between Tasks (s):").grid(row=row, column=0, sticky='e', padx=5,
-                                                                             pady=5)
-        self.task_execution_delay_entry = ttk.Entry(self.settings_frame)
+        ttk.Label(settings_scrollable_frame, text="Delay Between Tasks (s):").grid(row=row, column=0, sticky='e',
+                                                                                   padx=5,
+                                                                                   pady=5)
+        self.task_execution_delay_entry = ttk.Entry(settings_scrollable_frame)
         self.task_execution_delay_entry.insert(0, str(self.task_execution_delay))
         self.task_execution_delay_entry.grid(row=row, column=1, padx=5, pady=5)
         row += 1
 
         # Panel Key
-        ttk.Label(self.settings_frame, text="Panel Key:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
-        self.panel_key_entry = ttk.Entry(self.settings_frame)
+        ttk.Label(settings_scrollable_frame, text="Panel Key:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
+        self.panel_key_entry = ttk.Entry(settings_scrollable_frame)
         self.panel_key_entry.insert(0, self.panel_key)
         self.panel_key_entry.grid(row=row, column=1, padx=5, pady=5)
         row += 1
 
         # Specific Panel Keys
-        ttk.Label(self.settings_frame, text="Inventory Panel Key:").grid(row=row, column=0, sticky='e', padx=5,
-                                                                         pady=5)
-        self.inventory_key_entry = ttk.Entry(self.settings_frame)
+        ttk.Label(settings_scrollable_frame, text="Inventory Panel Key:").grid(row=row, column=0, sticky='e', padx=5,
+                                                                               pady=5)
+        self.inventory_key_entry = ttk.Entry(settings_scrollable_frame)
         self.inventory_key_entry.insert(0, self.inventory_key)
         self.inventory_key_entry.grid(row=row, column=1, padx=5, pady=5)
         row += 1
 
-        ttk.Label(self.settings_frame, text="Prayer Panel Key:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
-        self.prayer_key_entry = ttk.Entry(self.settings_frame)
+        ttk.Label(settings_scrollable_frame, text="Prayer Panel Key:").grid(row=row, column=0, sticky='e', padx=5,
+                                                                            pady=5)
+        self.prayer_key_entry = ttk.Entry(settings_scrollable_frame)
         self.prayer_key_entry.insert(0, self.prayer_key)
         self.prayer_key_entry.grid(row=row, column=1, padx=5, pady=5)
         row += 1
 
-        ttk.Label(self.settings_frame, text="Spells Panel Key:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
-        self.spells_key_entry = ttk.Entry(self.settings_frame)
+        ttk.Label(settings_scrollable_frame, text="Spells Panel Key:").grid(row=row, column=0, sticky='e', padx=5,
+                                                                            pady=5)
+        self.spells_key_entry = ttk.Entry(settings_scrollable_frame)
         self.spells_key_entry.insert(0, self.spells_key)
         self.spells_key_entry.grid(row=row, column=1, padx=5, pady=5)
         row += 1
 
         # Wait Times
-        ttk.Label(self.settings_frame, text="Wait Times:").grid(row=row, column=0, sticky='w', padx=5, pady=5)
+        ttk.Label(settings_scrollable_frame, text="Wait Times:").grid(row=row, column=0, sticky='w', padx=5, pady=5)
         row += 1
         self.wait_time_entries = {}
         for wait_name in self.wait_times:
-            ttk.Label(self.settings_frame, text=f"{wait_name}:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
-            entry = ttk.Entry(self.settings_frame)
+            ttk.Label(settings_scrollable_frame, text=f"{wait_name}:").grid(row=row, column=0, sticky='e', padx=5,
+                                                                            pady=5)
+            entry = ttk.Entry(settings_scrollable_frame)
             entry.insert(0, str(self.wait_times[wait_name]))
             entry.grid(row=row, column=1, padx=5, pady=5)
             self.wait_time_entries[wait_name] = entry
             row += 1
 
         # Save Settings Button
-        save_settings_btn = ttk.Button(self.settings_frame, text="Save Settings", command=self.save_settings)
+        save_settings_btn = ttk.Button(settings_scrollable_frame, text="Save Settings", command=self.save_settings)
         save_settings_btn.grid(row=row, column=0, columnspan=2, pady=10)
 
     def update_mouse_position(self):
@@ -735,14 +783,16 @@ class MacroApp(tk.Tk):
 
     def log(self, message):
         timestamp = time.strftime("%H:%M:%S")
-        self.log_text.insert(tk.END, f"[{timestamp}] {message}\n", 'timestamp')
+        self.log_text.insert(tk.END, f"[{timestamp}] {message}\n")
         self.log_text.see(tk.END)
 
     def log_macro_execution(self, macro_name, log_messages, total_time):
         # Insert messages into log_text widget with appropriate formatting and coloring
 
         # Start with a header
-        self.log_text.insert(tk.END, f"Macro '{macro_name}' executed in {total_time:.3f} seconds\n", 'macro_name')
+        timestamp = time.strftime("%H:%M:%S")
+        self.log_text.insert(tk.END, f"[{timestamp}] Macro '{macro_name}' executed in {total_time:.2f}s\n",
+                             'macro_name')
 
         # Insert each log message
         for msg in log_messages:
@@ -890,7 +940,7 @@ class MacroEditor(tk.Toplevel):
         self.macro_config = macro_config
         self.is_copy = is_copy
         self.title("Macro Editor")
-        self.geometry("600x750")
+        self.geometry("600x700")
         self.create_widgets()
 
     def create_widgets(self):
@@ -1035,7 +1085,7 @@ class MacroEditor(tk.Toplevel):
         elif action_type == 'return_mouse':
             return "Return Mouse to Original Position" + (
                 " and Click" if action.get('click_after_return', False) else "") + (
-                f" ({annotation})" if annotation else "")
+                       f" ({annotation})" if annotation else "")
         elif action_type == 'wait':
             return f"Wait for {action.get('duration')} seconds {f'({annotation})' if annotation else ''}"
         elif action_type == 'run_macro':
@@ -1230,7 +1280,7 @@ class ActionEditor(tk.Toplevel):
         self.action = action
         self.index = index
         self.title("Action Editor")
-        self.geometry("500x500")
+        self.geometry("500x600")
         self.create_widgets()
 
     def create_widgets(self):
@@ -1301,7 +1351,7 @@ class ActionEditor(tk.Toplevel):
             btn_frame = ttk.Frame(self.params_frame)
             btn_frame.grid(row=1, column=2, padx=5, pady=5, sticky='n')
 
-            add_pos_btn = ttk.Button(btn_frame, text="Add Position", command=self.add_click_position)
+            add_pos_btn = ttk.Button(btn_frame, text="Add Positions", command=self.add_click_positions)
             add_pos_btn.pack(side='top', padx=5, pady=2)
 
             del_pos_btn = ttk.Button(btn_frame, text="Delete Position", command=self.delete_click_position)
@@ -1408,23 +1458,46 @@ class ActionEditor(tk.Toplevel):
         # Load annotation
         self.annotation_entry.insert(0, self.action.get('annotation', ''))
 
-    def add_click_position(self):
-        self.info_label = ttk.Label(self, text="Move the mouse to the desired position and press 's' to set.")
+    def add_click_positions(self):
+        self.info_label = ttk.Label(self, text="Press 's' to save positions, 'c' to cancel. Press 'q' when done.")
         self.info_label.grid(row=4, column=0, columnspan=2, padx=10, pady=5)
 
-        self.wait_for_position()
+        self.position_window = tk.Toplevel(self)
+        self.position_window.title("Position Registration")
+        self.position_window.geometry("300x100")
 
-    def wait_for_position(self):
+        self.position_label = ttk.Label(self.position_window, text="Current Mouse Position: (0, 0)")
+        self.position_label.pack(padx=10, pady=10)
+
+        self.positions = []
+
+        self.running = True
+        self.update_mouse_position_in_window()
+        self.wait_for_positions()
+
+    def update_mouse_position_in_window(self):
+        if self.running:
+            x, y = pyautogui.position()
+            self.position_label.config(text=f"Current Mouse Position: ({x}, {y})")
+            self.position_window.after(100, self.update_mouse_position_in_window)
+
+    def wait_for_positions(self):
         def on_press(key):
             try:
                 if key.char.lower() == 's':
                     x, y = pyautogui.position()
+                    self.positions.append((x, y))
                     self.positions_listbox.insert('end', str((x, y)))
+                elif key.char.lower() == 'q':
+                    self.running = False
                     listener.stop()
                     self.info_label.destroy()
+                    self.position_window.destroy()
                 elif key.char.lower() == 'c':
+                    self.running = False
                     listener.stop()
                     self.info_label.destroy()
+                    self.position_window.destroy()
             except AttributeError:
                 pass
 
@@ -1434,7 +1507,9 @@ class ActionEditor(tk.Toplevel):
     def delete_click_position(self):
         selected = self.positions_listbox.curselection()
         if selected:
+            index = selected[0]
             self.positions_listbox.delete(selected)
+            del self.positions[index]
 
     def save_action(self):
         action_type = self.selected_action_type.get()

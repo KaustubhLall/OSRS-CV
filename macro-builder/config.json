@@ -471,22 +471,6 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            2137,
-                            970
-                        ]
-                    ],
-                    "modifiers": [],
-                    "annotation": "specr"
-                },
-                {
-                    "type": "wait",
-                    "duration": 0.55
-                },
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
-                        [
                             2001,
                             331
                         ]
@@ -500,6 +484,8 @@
             ],
             "is_dose_macro": false,
             "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1
@@ -1023,16 +1009,7 @@
         {
             "name": "nwe",
             "hotkey": "a",
-            "actions": [
-                {
-                    "type": "run_macro",
-                    "macro_name": "eat - restore"
-                },
-                {
-                    "type": "run_macro",
-                    "macro_name": "eat - brew"
-                }
-            ],
+            "actions": [],
             "is_dose_macro": false,
             "is_loop_macro": true,
             "schedule": null,

@@ -60,16 +60,16 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1962,
-                            1253
-                        ],
-                        [
                             2042,
                             1268
                         ],
                         [
                             2133,
                             1269
+                        ],
+                        [
+                            2214,
+                            1261
                         ]
                     ],
                     "modifiers": []
@@ -81,6 +81,8 @@
             ],
             "is_dose_macro": true,
             "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
             "dose_count": 4,
             "call_count": 0,
             "current_position_index": 0,
@@ -279,30 +281,6 @@
                         [
                             2053,
                             1207
-                        ],
-                        [
-                            2134,
-                            1203
-                        ],
-                        [
-                            2139,
-                            1053
-                        ],
-                        [
-                            2202,
-                            1044
-                        ],
-                        [
-                            2210,
-                            1116
-                        ],
-                        [
-                            2215,
-                            1192
-                        ],
-                        [
-                            2211,
-                            1261
                         ]
                     ],
                     "modifiers": []
@@ -314,6 +292,8 @@
             ],
             "is_dose_macro": true,
             "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
             "dose_count": 4,
             "call_count": 0,
             "current_position_index": 0,
@@ -1055,9 +1035,11 @@
             ],
             "is_dose_macro": false,
             "is_loop_macro": true,
+            "schedule": null,
+            "repeat_interval": null,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 5
+            "loop_count": -1
         },
         {
             "name": "spell - fire surge",
@@ -1101,5 +1083,6 @@
     "mouse_move_duration": 0.01,
     "wait_times": {
         "tick_time": 0.6
-    }
+    },
+    "task_execution_delay": 0.0
 }

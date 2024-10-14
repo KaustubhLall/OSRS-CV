@@ -1,5 +1,7 @@
 import ast
 import json
+import queue
+import re
 import threading
 import time
 import tkinter as tk
@@ -91,6 +93,8 @@ class Macro:
         self.loop_count = config.get("loop_count", 1) if self.is_loop_macro else 1
         self.current_loop_index = 0
 
+        self.schedule = config.get("schedule", None)
+        self.repeat_interval = config.get("repeat_interval", None)
         self.app = app
 
         self.running = False  # Flag to indicate if the macro is running
@@ -107,10 +111,8 @@ class Macro:
             self.context['should_stop'] = True
 
     def execute(self, threaded=True):
-        if threaded:
-            threading.Thread(target=self.run_macro).start()
-        else:
-            self.run_macro()
+        # Add the macro to the task queue
+        self.app.task_queue.put(self)
 
     def run_macro(self):
         if not self.app.macros_enabled:
@@ -275,7 +277,8 @@ class Macro:
                 if self.is_dose_macro:
                     local_state['call_count'] += 1
                     if local_state['call_count'] % self.dose_count == 0:
-                        local_state['current_position_index'] = (local_state['current_position_index'] + 1) % self.get_total_positions()
+                        local_state['current_position_index'] = (local_state[
+                                                                     'current_position_index'] + 1) % self.get_total_positions()
                         log.append(f"Cycled to next position index: {local_state['current_position_index']}")
 
             elif action_type == 'return_mouse':
@@ -350,7 +353,91 @@ def load_macros(app):
     for macro_config in app.config["macros"]:
         macro = Macro(macro_config, app)
         macros.append(macro)
+        # Schedule the macro if it has a schedule
+        if macro.schedule:
+            delay = parse_time(macro.schedule)
+            if delay is not None:
+                repeat_interval = parse_time(macro.repeat_interval) if macro.repeat_interval else None
+                app.scheduler.schedule_macro(macro, delay, repeat_interval)
+            else:
+                app.log(f"Invalid schedule format for macro '{macro.name}'.")
     return macros
+
+
+def parse_time(time_str):
+    regex = r'((?P<hours>\d+)h)?\s*((?P<minutes>\d+)m)?\s*((?P<seconds>\d+)s)?'
+    match = re.match(regex, time_str.strip())
+    if not match:
+        return None
+    time_dict = match.groupdict()
+    hours = int(time_dict.get('hours') or 0)
+    minutes = int(time_dict.get('minutes') or 0)
+    seconds = int(time_dict.get('seconds') or 0)
+    total_seconds = hours * 3600 + minutes * 60 + seconds
+    return total_seconds
+
+
+class TaskExecutor(threading.Thread):
+    def __init__(self, task_queue, delay_between_tasks, app):
+        super().__init__()
+        self.task_queue = task_queue
+        self.delay_between_tasks = delay_between_tasks
+        self.app = app
+        self.daemon = True
+        self.running = True
+
+    def run(self):
+        while self.running:
+            macro = self.task_queue.get()
+            if macro is None:
+                break
+            with self.app.running_macro_lock:
+                macro_thread = threading.Thread(target=macro.run_macro)
+                macro_thread.start()
+                macro_thread.join()
+            self.task_queue.task_done()
+            time.sleep(self.delay_between_tasks)
+
+    def stop(self):
+        self.running = False
+        # To unblock the queue.get() call
+        self.task_queue.put(None)
+
+
+class Scheduler(threading.Thread):
+    def __init__(self, app):
+        super().__init__()
+        self.app = app
+        self.daemon = True
+        self.scheduled_tasks = []
+        self.lock = threading.Lock()
+        self.running = True
+
+    def run(self):
+        while self.running:
+            now = time.time()
+            with self.lock:
+                for scheduled_task in self.scheduled_tasks[:]:
+                    if scheduled_task['next_run'] <= now:
+                        macro = scheduled_task['macro']
+                        self.app.task_queue.put(macro)
+                        if scheduled_task['repeat_interval'] is not None:
+                            scheduled_task['next_run'] = now + scheduled_task['repeat_interval']
+                        else:
+                            self.scheduled_tasks.remove(scheduled_task)
+            time.sleep(1)
+
+    def schedule_macro(self, macro, delay, repeat_interval=None):
+        next_run = time.time() + delay
+        with self.lock:
+            self.scheduled_tasks.append({
+                'macro': macro,
+                'next_run': next_run,
+                'repeat_interval': repeat_interval
+            })
+
+    def stop(self):
+        self.running = False
 
 
 # MacroApp Class
@@ -388,6 +475,18 @@ class MacroApp(tk.Tk):
         # Set pyautogui pause to 0.025 to eliminate default delay
         pyautogui.PAUSE = 0.025
 
+        # Configurable delay between tasks
+        self.task_execution_delay = self.config.get('task_execution_delay', 0.1)
+        # Task queue and executor
+        self.task_queue = queue.Queue()
+        self.running_macro_lock = threading.Lock()
+        self.task_executor = TaskExecutor(self.task_queue, self.task_execution_delay, self)
+        self.task_executor.start()
+
+        # Scheduler
+        self.scheduler = Scheduler(self)
+        self.scheduler.start()
+
         self.create_widgets()
         self.update_mouse_position()
         self.register_hotkeys()
@@ -414,7 +513,8 @@ class MacroApp(tk.Tk):
                     "Spells": "r"
                 },
                 "wait_times": {"tick_time": 0.6},
-                "macros": []
+                "macros": [],
+                "task_execution_delay": 0.1
             }
             self.save_config()
 
@@ -577,6 +677,14 @@ class MacroApp(tk.Tk):
         self.mouse_move_duration_entry.grid(row=row, column=1, padx=5, pady=5)
         row += 1
 
+        # Delay Between Tasks
+        ttk.Label(self.settings_frame, text="Delay Between Tasks (s):").grid(row=row, column=0, sticky='e', padx=5,
+                                                                             pady=5)
+        self.task_execution_delay_entry = ttk.Entry(self.settings_frame)
+        self.task_execution_delay_entry.insert(0, str(self.task_execution_delay))
+        self.task_execution_delay_entry.grid(row=row, column=1, padx=5, pady=5)
+        row += 1
+
         # Panel Key
         ttk.Label(self.settings_frame, text="Panel Key:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
         self.panel_key_entry = ttk.Entry(self.settings_frame)
@@ -649,6 +757,10 @@ class MacroApp(tk.Tk):
             self.action_registration_time_min = float(self.action_time_min_entry.get())
             self.action_registration_time_max = float(self.action_time_max_entry.get())
             self.mouse_move_duration = float(self.mouse_move_duration_entry.get())
+
+            self.task_execution_delay = float(self.task_execution_delay_entry.get())
+            self.task_executor.delay_between_tasks = self.task_execution_delay
+            self.config['task_execution_delay'] = self.task_execution_delay
 
             self.panel_key = self.panel_key_entry.get()
             self.inventory_key = self.inventory_key_entry.get()
@@ -778,7 +890,7 @@ class MacroEditor(tk.Toplevel):
         self.macro_config = macro_config
         self.is_copy = is_copy
         self.title("Macro Editor")
-        self.geometry("600x700")
+        self.geometry("600x750")
         self.create_widgets()
 
     def create_widgets(self):
@@ -820,17 +932,33 @@ class MacroEditor(tk.Toplevel):
         self.loop_count_entry.grid(row=6, column=1, padx=10, pady=5, sticky='w')
         self.loop_count_entry.config(state='disabled')  # Initially disabled
 
+        # Scheduler Options
+        self.schedule_var = tk.BooleanVar(value=False)
+        self.schedule_check = ttk.Checkbutton(self, text="Enable Scheduler", variable=self.schedule_var,
+                                              command=self.toggle_schedule_entries)
+        self.schedule_check.grid(row=7, column=0, columnspan=3, padx=10, pady=5, sticky='w')
+
+        ttk.Label(self, text="Schedule Delay (e.g., 2m5s):").grid(row=8, column=0, padx=10, pady=5, sticky='e')
+        self.schedule_entry = ttk.Entry(self, width=20)
+        self.schedule_entry.grid(row=8, column=1, padx=10, pady=5, sticky='w')
+        self.schedule_entry.config(state='disabled')  # Initially disabled
+
+        ttk.Label(self, text="Repeat Interval (e.g., 1h30m):").grid(row=9, column=0, padx=10, pady=5, sticky='e')
+        self.repeat_interval_entry = ttk.Entry(self, width=20)
+        self.repeat_interval_entry.grid(row=9, column=1, padx=10, pady=5, sticky='w')
+        self.repeat_interval_entry.config(state='disabled')  # Initially disabled
+
         # Actions List
-        ttk.Label(self, text="Actions:").grid(row=7, column=0, padx=10, pady=5, sticky='ne')
+        ttk.Label(self, text="Actions:").grid(row=10, column=0, padx=10, pady=5, sticky='ne')
         self.actions_listbox = tk.Listbox(self, height=15, width=50)
-        self.actions_listbox.grid(row=7, column=1, padx=10, pady=5, sticky='w')
+        self.actions_listbox.grid(row=10, column=1, padx=10, pady=5, sticky='w')
 
         # Bind double-click event
         self.actions_listbox.bind('<Double-1>', self.on_action_double_click)
 
         # Buttons for actions
         btn_frame = ttk.Frame(self)
-        btn_frame.grid(row=7, column=2, padx=10, pady=5, sticky='n')
+        btn_frame.grid(row=10, column=2, padx=10, pady=5, sticky='n')
 
         add_action_btn = ttk.Button(btn_frame, text="Add Action", command=self.add_action)
         add_action_btn.pack(side='top', padx=5, pady=2)
@@ -849,7 +977,7 @@ class MacroEditor(tk.Toplevel):
 
         # Save Button
         save_btn = ttk.Button(self, text="Save Macro", command=self.save_macro)
-        save_btn.grid(row=8, column=0, columnspan=3, pady=20)
+        save_btn.grid(row=11, column=0, columnspan=3, pady=20)
 
         self.actions_list = []  # List to store actions
 
@@ -875,6 +1003,17 @@ class MacroEditor(tk.Toplevel):
         else:
             self.loop_count_entry.delete(0, tk.END)
             self.loop_count_entry.config(state='disabled')
+
+    def toggle_schedule_entries(self):
+        if self.schedule_var.get():
+            self.schedule_entry.config(state='normal')
+            self.repeat_interval_entry.config(state='normal')
+            self.schedule_entry.focus()
+        else:
+            self.schedule_entry.delete(0, tk.END)
+            self.repeat_interval_entry.delete(0, tk.END)
+            self.schedule_entry.config(state='disabled')
+            self.repeat_interval_entry.config(state='disabled')
 
     def get_action_description(self, action):
         action_type = action.get('type')
@@ -915,6 +1054,12 @@ class MacroEditor(tk.Toplevel):
             self.is_loop_macro_var.set(True)
             self.loop_count_entry.config(state='normal')
             self.loop_count_entry.insert(0, str(self.macro_config.get('loop_count', 1)))
+        if self.macro_config.get('schedule', None):
+            self.schedule_var.set(True)
+            self.schedule_entry.config(state='normal')
+            self.schedule_entry.insert(0, self.macro_config.get('schedule', ''))
+            self.repeat_interval_entry.config(state='normal')
+            self.repeat_interval_entry.insert(0, self.macro_config.get('repeat_interval', ''))
         self.actions_list = self.macro_config.get('actions', [])
         for action in self.actions_list:
             self.actions_listbox.insert('end', self.get_action_description(action))
@@ -975,6 +1120,9 @@ class MacroEditor(tk.Toplevel):
         is_loop_macro = self.is_loop_macro_var.get()
         loop_count = None
 
+        schedule = None
+        repeat_interval = None
+
         if is_dose_macro:
             dose_count_str = self.dose_count_entry.get().strip()
             if not dose_count_str.isdigit() or int(dose_count_str) <= 0:
@@ -997,6 +1145,22 @@ class MacroEditor(tk.Toplevel):
                                      "Number of Loops must be a positive integer or -1 for infinite looping.")
                 return
 
+        if self.schedule_var.get():
+            schedule = self.schedule_entry.get().strip()
+            if not schedule:
+                messagebox.showerror("Invalid Input", "Please enter a valid schedule delay.")
+                return
+            parsed_schedule = parse_time(schedule)
+            if parsed_schedule is None:
+                messagebox.showerror("Invalid Format", "Schedule delay format is invalid.")
+                return
+            repeat_interval = self.repeat_interval_entry.get().strip()
+            if repeat_interval:
+                parsed_repeat = parse_time(repeat_interval)
+                if parsed_repeat is None:
+                    messagebox.showerror("Invalid Format", "Repeat interval format is invalid.")
+                    return
+
         if not name or not hotkey:
             messagebox.showerror("Missing Information", "Please fill in all the required fields.")
             return
@@ -1016,7 +1180,9 @@ class MacroEditor(tk.Toplevel):
             "hotkey": hotkey,
             "actions": self.actions_list,
             "is_dose_macro": is_dose_macro,
-            "is_loop_macro": is_loop_macro
+            "is_loop_macro": is_loop_macro,
+            "schedule": schedule,
+            "repeat_interval": repeat_interval
         }
 
         if is_dose_macro:

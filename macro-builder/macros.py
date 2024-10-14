@@ -407,11 +407,25 @@ class Macro:
 def load_macros(app):
     macros = []
     for macro_config in app.config["macros"]:
-        if "disabled" not in macro_config:
-            macro_config["disabled"] = False  # Ensure backward compatibility
+        # Ensure all necessary fields are present, set defaults if missing
+        macro_config.setdefault("disabled", False)
+        macro_config.setdefault("is_dose_macro", False)
+        if macro_config["is_dose_macro"]:
+            macro_config.setdefault("dose_count", 4)
+            macro_config.setdefault("call_count", 0)
+            macro_config.setdefault("current_position_index", 0)
+        macro_config.setdefault("is_loop_macro", False)
+        if macro_config["is_loop_macro"]:
+            macro_config.setdefault("loop_count", 1)
+        macro_config.setdefault("schedule", None)
+        macro_config.setdefault("repeat_interval", None)
+        macro_config.setdefault("actions", [])
+
+        # Create Macro instance
         macro = Macro(macro_config, app)
         macros.append(macro)
-        # Schedule the macro if it has a schedule
+
+        # Schedule the macro if it has a schedule and is not disabled
         if macro.schedule and not macro.disabled:
             delay = parse_time(macro.schedule)
             if delay is not None:
@@ -419,6 +433,10 @@ def load_macros(app):
                 app.scheduler.schedule_macro(macro, delay, repeat_interval)
             else:
                 app.log(f"Invalid schedule format for macro '{macro.name}'.")
+
+    # Sort macros alphabetically by name to ensure consistent order
+    macros.sort(key=lambda m: m.name.lower())
+
     return macros
 
 
@@ -581,6 +599,100 @@ class MacroApp(tk.Tk):
 
         self.log_details = {}  # Initialize log details storage
 
+    def initialize_macros(self):
+        """Initializes the macro_list_data with Macro instances loaded from config."""
+        self.macro_list_data = load_macros(self)
+
+    def register_hotkeys(self):
+        """
+        Registers hotkeys without reloading Macro instances to preserve their state.
+        This method updates the hotkey mappings based on the current state of macros.
+        """
+        # Stop any existing listener to prevent multiple listeners running
+        if self.hotkey_manager.listener:
+            self.hotkey_manager.listener.stop()
+
+        # Clear existing hotkeys
+        self.hotkey_manager.hotkeys.clear()
+
+        # Add hotkey to toggle macros on/off (F1)
+        self.hotkey_manager.hotkeys[frozenset(['f1'])] = self.toggle_macros
+
+        # Add hotkey to stop all scheduled macros (F2)
+        self.hotkey_manager.hotkeys[frozenset(['f2'])] = self.scheduler.stop_all_scheduled_macros
+
+        # Sort macros alphabetically by name
+        sorted_macros = sorted(self.macro_list_data, key=lambda m: m.name.lower())
+
+        # Register each enabled macro's hotkey
+        for macro in sorted_macros:
+            if macro.disabled:
+                continue  # Skip disabled macros
+            hotkey = macro.hotkey
+            keys = [self.hotkey_manager.normalize_key_name(k.strip()) for k in hotkey.split('+')]
+            key_set = frozenset(keys)
+            self.hotkey_manager.hotkeys[key_set] = macro
+
+        # Start the hotkey listener in a separate thread
+        self.hotkey_manager.listener = keyboard.Listener(
+            on_press=self.hotkey_manager.on_press,
+            on_release=self.hotkey_manager.on_release
+        )
+        self.hotkey_manager.listener.start()
+
+    def toggle_macro_enabled_state(self, macro):
+        """
+        Toggles the enabled/disabled state of a given macro without resetting its state.
+
+        Args:
+            macro (Macro): The macro instance to toggle.
+        """
+        # Toggle the disabled flag
+        macro.disabled = not macro.disabled
+
+        # Update the configuration to reflect the new state
+        macro_config = next((m for m in self.config['macros'] if m['name'] == macro.name), None)
+        if macro_config:
+            macro_config['disabled'] = macro.disabled
+
+        # Update the Treeview display
+        for item in self.macro_list.get_children():
+            values = self.macro_list.item(item, 'values')
+            if values[0] == macro.name:
+                enabled_status = 'Enabled' if not macro.disabled else 'Disabled'
+                self.macro_list.set(item, 'Enabled', enabled_status)
+                tag = 'enabled' if not macro.disabled else 'disabled'
+                self.macro_list.item(item, tags=(tag,))
+                break
+
+        # Save the updated configuration
+        self.save_config()
+
+        # Re-register hotkeys to reflect the change
+        self.register_hotkeys()
+
+        # Log the action
+        status = "enabled" if not macro.disabled else "disabled"
+        self.log(f"Macro '{macro.name}' has been {status}.", 'success')
+
+    def on_macro_list_click(self, event):
+        """
+        Handles clicks on the 'Enabled' column to toggle a macro's enabled status.
+        """
+        region = self.macro_list.identify('region', event.x, event.y)
+        if region != 'cell':
+            return
+        column = self.macro_list.identify_column(event.x)
+        if column != '#3':  # 'Enabled' is the third column
+            return
+        row = self.macro_list.identify_row(event.y)
+        if not row:
+            return
+        macro_name = self.macro_list.item(row, 'values')[0]
+        macro = next((m for m in self.macro_list_data if m.name == macro_name), None)
+        if macro:
+            self.toggle_macro_enabled_state(macro)
+
     def config_load(self):
         try:
             with open('config.json', 'r') as file:
@@ -614,31 +726,8 @@ class MacroApp(tk.Tk):
             self.config_save_required = False
         self.after(5000, self.periodic_save_config)
 
-    def initialize_macros(self):
-        # No default macros are added automatically
-        pass
-
     def load_config_macros(self):
         return load_macros(self)
-
-    def register_hotkeys(self):
-        # Clear existing Treeview items to prevent duplication
-        self.macro_list.delete(*self.macro_list.get_children())
-
-        self.macro_list_data = self.load_config_macros()
-        self.hotkey_manager.register_hotkeys(self.macro_list_data)
-
-        # Populate the treeview with existing macros including 'Enabled' status
-        for macro in self.config['macros']:
-            enabled = 'Enabled' if not macro.get('disabled', False) else 'Disabled'
-            call_count = macro.get('call_count', 0) if macro.get('is_dose_macro', False) else ""
-            reset_text = 'Reset' if macro.get('is_dose_macro', False) else ""
-            doses = macro['dose_count'] if macro.get('is_dose_macro', False) else "N/A"
-            tag = 'enabled' if not macro.get('disabled', False) else 'disabled'
-            self.macro_list.insert('', 'end',
-                                   values=(macro['name'], macro['hotkey'], enabled,
-                                           call_count, reset_text, doses),
-                                   tags=(tag,))
 
     def create_widgets(self):
         # Create the large status indicator at the top
@@ -665,6 +754,10 @@ class MacroApp(tk.Tk):
         main_instruction_label = ttk.Label(toolbar_frame,
                                            text="Use the 'Macros' tab to add or edit macros. Use the 'Settings' tab to configure timings and panel keys.")
         main_instruction_label.pack(side='left', padx=5, pady=5)
+
+        # Add Mouse Position Label to Toolbar Frame
+        self.mouse_pos_label = ttk.Label(toolbar_frame, text="Mouse Position: (0, 0)")
+        self.mouse_pos_label.pack(side='right', padx=5, pady=5)
 
         # Notebook for tabs
         self.notebook = ttk.Notebook(self)
@@ -815,41 +908,6 @@ class MacroApp(tk.Tk):
                 self.save_config()
                 self.log(f"Call count for macro '{macro_name}' has been reset.")
                 self.update_macro_call_count(macro)
-
-    def on_macro_list_click(self, event):
-        """Handles clicks on the 'Enabled' column to toggle macro's enabled status."""
-        region = self.macro_list.identify('region', event.x, event.y)
-        if region != 'cell':
-            return
-        column = self.macro_list.identify_column(event.x)
-        if column != '#3':  # 'Enabled' is the third column
-            return
-        row = self.macro_list.identify_row(event.y)
-        if not row:
-            return
-        macro_name = self.macro_list.item(row, 'values')[0]
-        macro = next((m for m in self.macro_list_data if m.name == macro_name), None)
-        if macro:
-            macro.disabled = not macro.disabled
-            # Update config
-            macro_config = next((c for c in self.config['macros'] if c['name'] == macro_name), None)
-            if macro_config:
-                macro_config['disabled'] = macro.disabled
-            # Update Treeview
-            enabled = 'Enabled' if not macro.disabled else 'Disabled'
-            self.macro_list.set(row, 'Enabled', enabled)
-            # Update tags for row coloring
-            if macro.disabled:
-                self.macro_list.item(row, tags=('disabled',))
-            else:
-                self.macro_list.item(row, tags=('enabled',))
-            # Save config
-            self.save_config()
-            # Register hotkeys again
-            self.register_hotkeys()
-            # Log the action
-            status = "disabled" if macro.disabled else "enabled"
-            self.log(f"Macro '{macro_name}' has been {status}.", 'success')
 
     def create_status_indicator(self):
         """Creates a large status indicator at the top of the UI."""
@@ -1016,10 +1074,6 @@ class MacroApp(tk.Tk):
         # Automatically select the latest log
         self.summary_tree.selection_set(log_id)
         self.on_summary_select(None)
-
-    def format_time(self, seconds):
-        milliseconds = int((seconds - int(seconds)) * 1000)
-        return f"{int(seconds)}s{milliseconds}ms"
 
     def log_macro_execution(self, macro_name, log_messages, total_time):
         timestamp = time.strftime("%H:%M:%S")
@@ -1279,7 +1333,27 @@ class MacroApp(tk.Tk):
         # Toggle the sort order for next click
         tree.heading(col, command=lambda: self.sort_treeview(tree, col, not reverse))
 
+    def format_time(self, seconds):
+        milliseconds = int((seconds - int(seconds)) * 1000)
+        return f"{int(seconds)}s{milliseconds}ms"
 
+    def log_macro_execution(self, macro_name, log_messages, total_time):
+        timestamp = time.strftime("%H:%M:%S")
+        log_id = f"{timestamp}_{macro_name}_{len(self.log_details)}"  # Unique ID
+
+        # Add to summary log
+        self.summary_tree.insert('', 'end', values=(timestamp, macro_name, self.format_time(total_time)), iid=log_id)
+
+        # Store the detailed log
+        detailed_log = ""
+        for msg in log_messages:
+            detailed_log += f"{msg}\n"
+
+        self.log_details[log_id] = detailed_log
+
+        # Automatically select the latest log
+        self.summary_tree.selection_set(log_id)
+        self.on_summary_select(None)
 
 
 class MacroEditor(tk.Toplevel):
@@ -1623,6 +1697,7 @@ class MacroEditor(tk.Toplevel):
                                  "A macro with this name already exists. Please choose a different name.")
             return
 
+        # Build the new macro configuration
         new_macro = {
             "name": name,
             "hotkey": hotkey,
@@ -1650,24 +1725,38 @@ class MacroEditor(tk.Toplevel):
             new_macro["loop_count"] = 1
 
         if self.macro_config and not self.is_copy:
-            # Update existing macro
+            # Update existing macro in config
             index = self.parent.config['macros'].index(self.macro_config)
             self.parent.config['macros'][index] = new_macro
         else:
-            # Add new macro
+            # Add new macro to config
             self.parent.config['macros'].append(new_macro)
+            self.parent.save_config()
 
-        self.parent.save_config()
-        # Refresh the macro list
-        self.parent.macro_list.delete(*self.parent.macro_list.get_children())
-        for macro in self.parent.config['macros']:
-            doses = macro['dose_count'] if macro.get('is_dose_macro', False) else "N/A"
-            call_count = macro.get('call_count', 0) if macro.get('is_dose_macro', False) else ""
-            reset_text = 'Reset' if macro.get('is_dose_macro', False) else ""
+            # Create and add a new Macro instance
+            new_macro_instance = Macro(new_macro, self.parent)
+            self.parent.macro_list_data.append(new_macro_instance)
+
+            # Insert the new macro into the Treeview
+            enabled = 'Enabled' if not new_macro['disabled'] else 'Disabled'
+            call_count = new_macro['call_count'] if new_macro.get('is_dose_macro', False) else ""
+            reset_text = 'Reset' if new_macro.get('is_dose_macro', False) else ""
+            doses = new_macro['dose_count'] if new_macro.get('is_dose_macro', False) else "N/A"
+            tag = 'enabled' if not new_macro['disabled'] else 'disabled'
             self.parent.macro_list.insert('', 'end',
-                                          values=(macro['name'], macro['hotkey'], doses, call_count, reset_text))
+                                          values=(new_macro['name'], new_macro['hotkey'], enabled,
+                                                  call_count, reset_text, doses),
+                                          tags=(tag,))
+
+        # Re-register hotkeys to reflect changes without resetting the view
         self.parent.register_hotkeys()
+
+        # Save the updated configuration
+        self.parent.save_config()
+
+        # Log the action
         self.parent.log(f"Macro '{name}' has been saved.", 'success')
+
         self.destroy()
 
 
@@ -2007,13 +2096,13 @@ class ActionEditor(tk.Toplevel):
             self.parent.actions_list[self.index] = action
             # Update the actions_tree
             self.parent.actions_tree.delete(self.parent.actions_tree.get_children()[self.index])
-            action_type, description, annotation = self.parent.get_action_description(action)
-            self.parent.actions_tree.insert('', self.index, values=(action_type, description, annotation))
+            action_type_clean, description, annotation = self.parent.get_action_description(action)
+            self.parent.actions_tree.insert('', self.index, values=(action_type_clean, description, annotation))
         else:
             # Adding new action
             self.parent.actions_list.append(action)
-            action_type, description, annotation = self.parent.get_action_description(action)
-            self.parent.actions_tree.insert('end', values=(action_type, description, annotation))
+            action_type_clean, description, annotation = self.parent.get_action_description(action)
+            self.parent.actions_tree.insert('', 'end', values=(action_type_clean, description, annotation))
         self.destroy()
 
 
@@ -2022,4 +2111,3 @@ if __name__ == "__main__":
     app = MacroApp()
     # Run the GUI in the main thread
     app.mainloop()
-

@@ -51,7 +51,7 @@
             "is_loop_macro": false,
             "schedule": null,
             "repeat_interval": null,
-            "disabled": false,
+            "disabled": true,
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1
@@ -128,7 +128,9 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1,
-            "disabled": false
+            "disabled": false,
+            "schedule": null,
+            "repeat_interval": null
         },
         {
             "name": "prayer - melee",
@@ -163,7 +165,9 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1,
-            "disabled": false
+            "disabled": false,
+            "schedule": null,
+            "repeat_interval": null
         },
         {
             "name": "prayer - mage",
@@ -198,11 +202,13 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1,
-            "disabled": false
+            "disabled": false,
+            "schedule": null,
+            "repeat_interval": null
         },
         {
             "name": "spell - ancient - barrage",
-            "hotkey": "ccr",
+            "hotkey": "c",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
@@ -230,10 +236,12 @@
             ],
             "is_dose_macro": false,
             "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": false,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1,
-            "disabled": true
+            "loop_count": 1
         },
         {
             "name": "panic tele",
@@ -264,7 +272,9 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1,
-            "disabled": false
+            "disabled": false,
+            "schedule": null,
+            "repeat_interval": null
         },
         {
             "name": "eat - brew",
@@ -357,7 +367,9 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1,
-            "disabled": false
+            "disabled": false,
+            "schedule": null,
+            "repeat_interval": null
         },
         {
             "name": "swap2",
@@ -408,7 +420,9 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1,
-            "disabled": false
+            "disabled": false,
+            "schedule": null,
+            "repeat_interval": null
         },
         {
             "name": "prayer - augury/rigor",
@@ -448,7 +462,9 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1,
-            "disabled": false
+            "disabled": false,
+            "schedule": null,
+            "repeat_interval": null
         },
         {
             "name": "melee spec",
@@ -540,7 +556,9 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1,
-            "disabled": false
+            "disabled": false,
+            "schedule": null,
+            "repeat_interval": null
         },
         {
             "name": "SPELL TB",
@@ -577,7 +595,10 @@
             "is_dose_macro": false,
             "call_count": 0,
             "current_position_index": 0,
-            "disabled": false
+            "disabled": false,
+            "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null
         },
         {
             "name": "loadout_gen",
@@ -864,7 +885,9 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1,
-            "disabled": false
+            "disabled": false,
+            "schedule": null,
+            "repeat_interval": null
         },
         {
             "name": "clean herb",
@@ -980,18 +1003,24 @@
                         ]
                     ],
                     "modifiers": []
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
                 }
             ],
             "is_dose_macro": false,
             "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": true,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1,
-            "disabled": false
+            "loop_count": 1
         },
         {
             "name": "spell - crumble undead",
-            "hotkey": "ccc",
+            "hotkey": "c",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
@@ -1019,20 +1048,9 @@
             ],
             "is_dose_macro": false,
             "is_loop_macro": false,
-            "call_count": 0,
-            "current_position_index": 0,
-            "loop_count": 1,
-            "disabled": true
-        },
-        {
-            "name": "nwe",
-            "hotkey": "space",
-            "actions": [],
-            "is_dose_macro": false,
-            "is_loop_macro": false,
             "schedule": null,
             "repeat_interval": null,
-            "disabled": false,
+            "disabled": true,
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1
@@ -1074,7 +1092,61 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": -1,
-            "disabled": false
+            "disabled": true,
+            "schedule": null,
+            "repeat_interval": null
+        },
+        {
+            "name": "test",
+            "hotkey": "a",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2009,
+                            838
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "wait",
+                    "duration": 0.15
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2014,
+                            827
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "schedule": "0",
+            "repeat_interval": "2",
+            "disabled": false,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
         }
     ],
     "mouse_move_duration": 0.01,

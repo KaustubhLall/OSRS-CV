@@ -418,14 +418,13 @@ def load_macros(app):
 
 
 def parse_time(time_str):
-    regex = r'((?P<hours>\d+)h)?\s*((?P<minutes>\d+)m)?\s*((?P<seconds>\d+)s)?'
-    match = re.match(regex, time_str.strip())
+    pattern = r'((?P<hours>\d+)h)?\s*((?P<minutes>\d+)m)?\s*((?P<seconds>\d+)s?)?'
+    match = re.match(pattern, time_str)
     if not match:
         return None
-    time_dict = match.groupdict()
-    hours = int(time_dict.get('hours') or 0)
-    minutes = int(time_dict.get('minutes') or 0)
-    seconds = int(time_dict.get('seconds') or 0)
+    hours = int(match.group('hours')) if match.group('hours') else 0
+    minutes = int(match.group('minutes')) if match.group('minutes') else 0
+    seconds = int(match.group('seconds')) if match.group('seconds') else 0
     total_seconds = hours * 3600 + minutes * 60 + seconds
     return total_seconds
 
@@ -484,6 +483,14 @@ class Scheduler(threading.Thread):
                             self.scheduled_tasks.remove(scheduled_task)
             time.sleep(1)
 
+    def schedule_macro(self, macro, delay, repeat_interval=None):
+        next_run = time.time() + delay
+        with self.lock:
+            self.scheduled_tasks.append({
+                'macro': macro,
+                'next_run': next_run,
+                'repeat_interval': repeat_interval
+            })
 
     def schedule_macro(self, macro, delay, repeat_interval=None):
         next_run = time.time() + delay
@@ -608,6 +615,13 @@ class MacroApp(tk.Tk):
         self.macro_list_data = self.load_config_macros()
         self.hotkey_manager.register_hotkeys(self.macro_list_data)
 
+        # Schedule macros that have a schedule
+        for macro in self.macro_list_data:
+            if macro.schedule:
+                delay = parse_time(macro.schedule)
+                repeat_interval = parse_time(macro.repeat_interval) if macro.repeat_interval else None
+                self.scheduler.schedule_macro(macro, delay, repeat_interval)
+
     def create_widgets(self):
         self.style = ttk.Style()
         self.style.configure('TNotebook.Tab', padding=(12, 8))
@@ -623,14 +637,19 @@ class MacroApp(tk.Tk):
         self.toggle_macros_button = ttk.Button(toolbar_frame, text="Disable Macros", command=self.toggle_macros)
         self.toggle_macros_button.pack(side='left', padx=5, pady=5)
 
-        # Add "Disable Scheduling" Button
+        # Add Red/Green Indicator for Macros Enabled/Disabled
+        self.macros_status_indicator = tk.Canvas(toolbar_frame, width=20, height=20, highlightthickness=0)
+        self.update_macros_status_indicator()
+        self.macros_status_indicator.pack(side='left', padx=5, pady=5)
+
+        # Disable Scheduling Button
         self.toggle_scheduling_button = ttk.Button(toolbar_frame, text="Disable Scheduling",
                                                    command=self.toggle_scheduling)
         self.toggle_scheduling_button.pack(side='left', padx=5, pady=5)
 
-        # Enable/Disable Macros Button
-        self.toggle_macros_button = ttk.Button(toolbar_frame, text="Disable Macros", command=self.toggle_macros)
-        self.toggle_macros_button.pack(side='left', padx=5, pady=5)
+        # "Reset All" Button moved to the toolbar
+        reset_all_button = ttk.Button(toolbar_frame, text="Reset All", command=self.reset_all_macros)
+        reset_all_button.pack(side='left', padx=5, pady=5)
 
         # Main Instruction Label
         main_instruction_label = ttk.Label(toolbar_frame,
@@ -664,6 +683,9 @@ class MacroApp(tk.Tk):
         # Detailed Log Frame
         self.details_log_frame = ttk.Frame(log_paned_window)
         log_paned_window.add(self.details_log_frame, weight=1)
+
+        # Set the sash position to make it a 50-50 split after the window is fully loaded
+        self.after(100, lambda: log_paned_window.sashpos(0, self.winfo_width() // 2))
 
         # Treeview for Summary Log
         columns = ('Timestamp', 'Macro', 'Total Time')
@@ -1104,16 +1126,33 @@ class MacroApp(tk.Tk):
 
     def reset_eta_tracker(self):
         self.eta_label.config(text="Estimated Time Remaining: N/A")
+
     def reset_all_macros(self):
-        confirm = messagebox.askyesno("Confirm Reset", "Are you sure you want to reset all macros?")
-        if confirm:
-            for macro in self.macro_list_data:
-                macro.reset_call_count()
-            self.save_config()
-            self.log("All macros have been reset.", 'success')
-            # Update the macro list display
-            for macro in self.macro_list_data:
-                self.update_macro_call_count(macro)
+        for macro in self.macro_list_data:
+            macro.reset_call_count()
+        self.save_config()
+        self.log("All macros have been reset.", 'success')
+        # Update the macro list display
+        for macro in self.macro_list_data:
+            self.update_macro_call_count(macro)
+
+    def update_macros_status_indicator(self):
+        self.macros_status_indicator.delete("all")
+        if self.macros_enabled:
+            color = 'green'
+        else:
+            color = 'red'
+        self.macros_status_indicator.create_oval(5, 5, 15, 15, fill=color)
+
+    def toggle_macros(self):
+        self.macros_enabled = not self.macros_enabled
+        if self.macros_enabled:
+            self.toggle_macros_button.config(text="Disable Macros")
+            self.log("Macros enabled.", 'success')
+        else:
+            self.toggle_macros_button.config(text="Enable Macros")
+            self.log("Macros disabled via killswitch.", 'error')
+        self.update_macros_status_indicator()
 
 
 class MacroEditor(tk.Toplevel):
@@ -1123,7 +1162,7 @@ class MacroEditor(tk.Toplevel):
         self.macro_config = macro_config
         self.is_copy = is_copy
         self.title("Macro Editor")
-        self.geometry("700x600")  # Adjusted size
+        self.geometry("700x600")
         self.resizable(True, True)
         self.create_widgets()
 
@@ -1142,48 +1181,53 @@ class MacroEditor(tk.Toplevel):
         self.hotkey_entry = ttk.Entry(self, width=30)
         self.hotkey_entry.grid(row=2, column=1, columnspan=2, padx=10, pady=5, sticky='w')
 
+        # Disabled Checkbox
+        self.disabled_var = tk.BooleanVar(value=False)
+        self.disabled_check = ttk.Checkbutton(self, text="Disable Macro", variable=self.disabled_var)
+        self.disabled_check.grid(row=3, column=0, columnspan=3, padx=10, pady=5, sticky='w')
+
         # Dose-Counting Macro Checkbox
         self.is_dose_macro_var = tk.BooleanVar(value=False)
         self.is_dose_macro_check = ttk.Checkbutton(self, text="Enable Dose-Counting", variable=self.is_dose_macro_var,
                                                    command=self.toggle_dose_count_entry)
-        self.is_dose_macro_check.grid(row=3, column=0, columnspan=3, padx=10, pady=5, sticky='w')
+        self.is_dose_macro_check.grid(row=4, column=0, columnspan=3, padx=10, pady=5, sticky='w')
 
         # Number of Doses Entry (only visible if dose-counting is enabled)
-        ttk.Label(self, text="Number of Doses:").grid(row=4, column=0, padx=10, pady=5, sticky='e')
+        ttk.Label(self, text="Number of Doses:").grid(row=5, column=0, padx=10, pady=5, sticky='e')
         self.dose_count_entry = ttk.Entry(self, width=10)
-        self.dose_count_entry.grid(row=4, column=1, padx=10, pady=5, sticky='w')
+        self.dose_count_entry.grid(row=5, column=1, padx=10, pady=5, sticky='w')
         self.dose_count_entry.config(state='disabled')  # Initially disabled
 
         # Looping Macro Checkbox
         self.is_loop_macro_var = tk.BooleanVar(value=False)
         self.is_loop_macro_check = ttk.Checkbutton(self, text="Enable Looping", variable=self.is_loop_macro_var,
                                                    command=self.toggle_loop_count_entry)
-        self.is_loop_macro_check.grid(row=5, column=0, columnspan=3, padx=10, pady=5, sticky='w')
+        self.is_loop_macro_check.grid(row=6, column=0, columnspan=3, padx=10, pady=5, sticky='w')
 
         # Number of Loops Entry
-        ttk.Label(self, text="Number of Loops (-1 for infinite):").grid(row=6, column=0, padx=10, pady=5, sticky='e')
+        ttk.Label(self, text="Number of Loops (-1 for infinite):").grid(row=7, column=0, padx=10, pady=5, sticky='e')
         self.loop_count_entry = ttk.Entry(self, width=10)
-        self.loop_count_entry.grid(row=6, column=1, padx=10, pady=5, sticky='w')
+        self.loop_count_entry.grid(row=7, column=1, padx=10, pady=5, sticky='w')
         self.loop_count_entry.config(state='disabled')  # Initially disabled
 
         # Scheduler Options
         self.schedule_var = tk.BooleanVar(value=False)
         self.schedule_check = ttk.Checkbutton(self, text="Enable Scheduler", variable=self.schedule_var,
                                               command=self.toggle_schedule_entries)
-        self.schedule_check.grid(row=7, column=0, columnspan=3, padx=10, pady=5, sticky='w')
+        self.schedule_check.grid(row=8, column=0, columnspan=3, padx=10, pady=5, sticky='w')
 
-        ttk.Label(self, text="Schedule Delay (e.g., 2m5s):").grid(row=8, column=0, padx=10, pady=5, sticky='e')
+        ttk.Label(self, text="Schedule Delay (e.g., 2m5s):").grid(row=9, column=0, padx=10, pady=5, sticky='e')
         self.schedule_entry = ttk.Entry(self, width=20)
-        self.schedule_entry.grid(row=8, column=1, padx=10, pady=5, sticky='w')
+        self.schedule_entry.grid(row=9, column=1, padx=10, pady=5, sticky='w')
         self.schedule_entry.config(state='disabled')  # Initially disabled
 
-        ttk.Label(self, text="Repeat Interval (e.g., 1h30m):").grid(row=9, column=0, padx=10, pady=5, sticky='e')
+        ttk.Label(self, text="Repeat Interval (e.g., 1h30m):").grid(row=10, column=0, padx=10, pady=5, sticky='e')
         self.repeat_interval_entry = ttk.Entry(self, width=20)
-        self.repeat_interval_entry.grid(row=9, column=1, padx=10, pady=5, sticky='w')
+        self.repeat_interval_entry.grid(row=10, column=1, padx=10, pady=5, sticky='w')
         self.repeat_interval_entry.config(state='disabled')  # Initially disabled
 
         # Actions List
-        ttk.Label(self, text="Actions:").grid(row=10, column=0, padx=10, pady=5, sticky='ne')
+        ttk.Label(self, text="Actions:").grid(row=11, column=0, padx=10, pady=5, sticky='ne')
 
         # Use a Treeview to display actions with type, description, and annotation
         self.actions_tree = ttk.Treeview(self, columns=('Type', 'Description', 'Annotation'), show='headings',
@@ -1194,14 +1238,14 @@ class MacroEditor(tk.Toplevel):
         self.actions_tree.column('Type', width=100)
         self.actions_tree.column('Description', width=300)
         self.actions_tree.column('Annotation', width=200)
-        self.actions_tree.grid(row=10, column=1, padx=10, pady=5, sticky='nsew')
+        self.actions_tree.grid(row=11, column=1, padx=10, pady=5, sticky='nsew')
 
         # Bind double-click event
         self.actions_tree.bind('<Double-1>', self.on_action_double_click)
 
         # Buttons for actions
         btn_frame = ttk.Frame(self)
-        btn_frame.grid(row=10, column=2, padx=10, pady=5, sticky='n')
+        btn_frame.grid(row=11, column=2, padx=10, pady=5, sticky='n')
 
         add_action_btn = ttk.Button(btn_frame, text="Add Action", command=self.add_action)
         add_action_btn.pack(side='top', padx=5, pady=2)
@@ -1223,13 +1267,13 @@ class MacroEditor(tk.Toplevel):
 
         # Save Button
         save_btn = ttk.Button(self, text="Save Macro", command=self.save_macro)
-        save_btn.grid(row=11, column=0, columnspan=3, pady=20)
+        save_btn.grid(row=12, column=0, columnspan=3, pady=20)
 
         self.actions_list = []  # List to store actions
 
         # Make the window resizable
         self.columnconfigure(1, weight=1)
-        self.rowconfigure(10, weight=1)
+        self.rowconfigure(11, weight=1)
 
         # Load macro data if editing
         if self.macro_config:
@@ -1269,108 +1313,120 @@ class MacroEditor(tk.Toplevel):
         action_type = action.get('type')
         annotation = action.get('annotation', '')
         if action_type == 'press_panel_key':
-            return f"Press Panel Key '{action.get('key')}' {f'({annotation})' if annotation else ''}"
+            description = f"Press Panel Key '{action.get('key')}'"
         elif action_type == 'press_specific_panel_key':
             if action.get('panel') == 'Custom':
-                return f"Press Specific Panel Key '{action.get('custom_key')}' {f'({annotation})' if annotation else ''}"
+                description = f"Press Specific Panel Key '{action.get('custom_key')}'"
             else:
-                return f"Press Specific Panel Key '{action.get('panel')}' {f'({annotation})' if annotation else ''}"
+                description = f"Press Specific Panel Key '{action.get('panel')}'"
         elif action_type == 'click':
             if action.get('use_saved_target', False):
-                return f"Click at Saved Target Position {f'({annotation})' if annotation else ''}"
+                description = "Click at Saved Target Position"
             else:
                 positions = action.get('positions', [])
                 modifiers = action.get('modifiers', [])
-                return f"Click at Positions {positions} with modifiers {modifiers} {f'({annotation})' if annotation else ''}"
+                description = f"Click at Positions {positions} with modifiers {modifiers}"
         elif action_type == 'return_mouse':
-            return "Return Mouse to Original Position" + (
-                " and Click" if action.get('click_after_return', False) else "") + (
-                f" ({annotation})" if annotation else "")
+            description = "Return Mouse to Original Position" + (
+                " and Click" if action.get('click_after_return', False) else "")
         elif action_type == 'wait':
-            return f"Wait for {action.get('duration')} seconds {f'({annotation})' if annotation else ''}"
+            description = f"Wait for {action.get('duration')} seconds"
         elif action_type == 'run_macro':
-            return f"Run Macro '{action.get('macro_name')}' {f'({annotation})' if annotation else ''}"
+            description = f"Run Macro '{action.get('macro_name')}'"
         else:
-            return "Unknown Action"
+            description = "Unknown Action"
+        return action_type.replace('_', ' ').title(), description, annotation
 
     def load_macro_data(self):
-        self.name_entry.insert(0, self.macro_config['name'])
-        self.hotkey_entry.insert(0, self.macro_config['hotkey'])
+        self.name_entry.insert(0, self.macro_config.get('name', ''))
+        self.hotkey_entry.insert(0, self.macro_config.get('hotkey', ''))
+
+        # Handle 'disabled' field
         self.disabled_var.set(self.macro_config.get('disabled', False))
+
         if self.macro_config.get('is_dose_macro', False):
             self.is_dose_macro_var.set(True)
             self.dose_count_entry.config(state='normal')
             self.dose_count_entry.insert(0, str(self.macro_config.get('dose_count', 4)))
+        else:
+            self.is_dose_macro_var.set(False)
+            self.dose_count_entry.config(state='disabled')
+
         if self.macro_config.get('is_loop_macro', False):
             self.is_loop_macro_var.set(True)
             self.loop_count_entry.config(state='normal')
             self.loop_count_entry.insert(0, str(self.macro_config.get('loop_count', 1)))
+        else:
+            self.is_loop_macro_var.set(False)
+            self.loop_count_entry.config(state='disabled')
+
         if self.macro_config.get('schedule', None):
             self.schedule_var.set(True)
             self.schedule_entry.config(state='normal')
             self.schedule_entry.insert(0, self.macro_config.get('schedule', ''))
             self.repeat_interval_entry.config(state='normal')
             self.repeat_interval_entry.insert(0, self.macro_config.get('repeat_interval', ''))
+        else:
+            self.schedule_var.set(False)
+            self.schedule_entry.config(state='disabled')
+            self.repeat_interval_entry.config(state='disabled')
+
         self.actions_list = self.macro_config.get('actions', [])
         for action in self.actions_list:
-            self.actions_listbox.insert('end', self.get_action_description(action))
+            action_type, description, annotation = self.get_action_description(action)
+            self.actions_tree.insert('', 'end', values=(action_type, description, annotation))
 
     def add_action(self):
         ActionEditor(self, None)
 
     def edit_action(self):
-        selected = self.actions_listbox.curselection()
+        selected = self.actions_tree.selection()
         if selected:
-            index = selected[0]
+            index = self.actions_tree.index(selected[0])
             action = self.actions_list[index]
             ActionEditor(self, action, index)
         else:
             messagebox.showwarning("No Selection", "Please select an action to edit.")
 
     def copy_action(self):
-        selected = self.actions_listbox.curselection()
+        selected = self.actions_tree.selection()
         if selected:
-            index = selected[0]
-            action = self.actions_list[index]
-            import copy
-            new_action = copy.deepcopy(action)
-            self.actions_list.insert(index + 1, new_action)
-            self.actions_listbox.insert(index + 1, self.get_action_description(new_action))
+            index = self.actions_tree.index(selected[0])
+            action = self.actions_list[index].copy()
+            self.actions_list.insert(index + 1, action)
+            action_type, description, annotation = self.get_action_description(action)
+            self.actions_tree.insert('', index + 1, values=(action_type, description, annotation))
         else:
             messagebox.showwarning("No Selection", "Please select an action to copy.")
 
     def delete_action(self):
-        selected = self.actions_listbox.curselection()
+        selected = self.actions_tree.selection()
         if selected:
-            index = selected[0]
+            index = self.actions_tree.index(selected[0])
             self.actions_list.pop(index)
-            self.actions_listbox.delete(index)
+            self.actions_tree.delete(selected)
         else:
             messagebox.showwarning("No Selection", "Please select an action to delete.")
 
     def move_action_up(self):
-        selected = self.actions_listbox.curselection()
-        if selected and selected[0] > 0:
-            index = selected[0]
+        selected = self.actions_tree.selection()
+        if selected and self.actions_tree.index(selected[0]) > 0:
+            index = self.actions_tree.index(selected[0])
             self.actions_list[index - 1], self.actions_list[index] = self.actions_list[index], self.actions_list[
                 index - 1]
-            action_text = self.actions_listbox.get(index)
-            self.actions_listbox.delete(index)
-            self.actions_listbox.insert(index - 1, action_text)
-            self.actions_listbox.selection_set(index - 1)
+            self.actions_tree.move(selected[0], '', index - 1)
+            self.actions_tree.selection_set(selected[0])
         else:
             messagebox.showwarning("Cannot Move", "Cannot move the selected action up.")
 
     def move_action_down(self):
-        selected = self.actions_listbox.curselection()
-        if selected and selected[0] < len(self.actions_list) - 1:
-            index = selected[0]
+        selected = self.actions_tree.selection()
+        if selected and self.actions_tree.index(selected[0]) < len(self.actions_list) - 1:
+            index = self.actions_tree.index(selected[0])
             self.actions_list[index + 1], self.actions_list[index] = self.actions_list[index], self.actions_list[
                 index + 1]
-            action_text = self.actions_listbox.get(index)
-            self.actions_listbox.delete(index)
-            self.actions_listbox.insert(index + 1, action_text)
-            self.actions_listbox.selection_set(index + 1)
+            self.actions_tree.move(selected[0], '', index + 1)
+            self.actions_tree.selection_set(selected[0])
         else:
             messagebox.showwarning("Cannot Move", "Cannot move the selected action down.")
 
@@ -1481,12 +1537,10 @@ class MacroEditor(tk.Toplevel):
             doses = macro['dose_count'] if macro.get('is_dose_macro', False) else "N/A"
             call_count = macro.get('call_count', 0) if macro.get('is_dose_macro', False) else ""
             reset_text = 'Reset' if macro.get('is_dose_macro', False) else ""
-            disabled_text = 'Yes' if macro.get('disabled', False) else 'No'
             self.parent.macro_list.insert('', 'end',
-                                          values=(macro['name'], macro['hotkey'], call_count, reset_text, disabled_text,
-                                                  doses))
+                                          values=(macro['name'], macro['hotkey'], doses, call_count, reset_text))
         self.parent.register_hotkeys()
-        self.parent.log(f"Macro '{name}' has been saved.")
+        self.parent.log(f"Macro '{name}' has been saved.", 'success')
         self.destroy()
 
 
@@ -1499,6 +1553,7 @@ class ActionEditor(tk.Toplevel):
         self.index = index
         self.title("Action Editor")
         self.geometry("500x600")
+        self.resizable(True, True)
         self.create_widgets()
 
     def create_widgets(self):
@@ -1823,12 +1878,15 @@ class ActionEditor(tk.Toplevel):
         if self.action is not None:
             # Editing existing action
             self.parent.actions_list[self.index] = action
-            self.parent.actions_listbox.delete(self.index)
-            self.parent.actions_listbox.insert(self.index, self.parent.get_action_description(action))
+            # Update the actions_tree
+            self.parent.actions_tree.delete(self.parent.actions_tree.get_children()[self.index])
+            action_type, description, annotation = self.parent.get_action_description(action)
+            self.parent.actions_tree.insert('', self.index, values=(action_type, description, annotation))
         else:
             # Adding new action
             self.parent.actions_list.append(action)
-            self.parent.actions_listbox.insert('end', self.parent.get_action_description(action))
+            action_type, description, annotation = self.parent.get_action_description(action)
+            self.parent.actions_tree.insert('end', values=(action_type, description, annotation))
         self.destroy()
 
 

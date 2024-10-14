@@ -15,7 +15,8 @@
             "actions": [
                 {
                     "type": "press_specific_panel_key",
-                    "panel": "Inventory"
+                    "panel": "Inventory",
+                    "annotation": "open inventory"
                 },
                 {
                     "type": "press_specific_panel_key",
@@ -75,7 +76,8 @@
                             1273
                         ]
                     ],
-                    "modifiers": []
+                    "modifiers": [],
+                    "annotation": "inventory positions"
                 },
                 {
                     "type": "return_mouse",
@@ -1076,7 +1078,8 @@
     ],
     "mouse_move_duration": 0.01,
     "wait_times": {
-        "tick_time": 0.6
+        "tick_time": 0.6,
+        "4-tick": 2.4
     },
     "task_execution_delay": 0.0
 }

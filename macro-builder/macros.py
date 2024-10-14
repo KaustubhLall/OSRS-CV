@@ -61,11 +61,16 @@ class HotkeyManager:
         # Clear existing hotkeys
         self.hotkeys.clear()
 
-        # Add hotkey to toggle macros on/off
+        # Add hotkey to toggle macros on/off (F1)
         self.hotkeys[frozenset(['f1'])] = self.app.toggle_macros
+
+        # Add hotkey to stop all scheduled macros (F2)
+        self.hotkeys[frozenset(['f2'])] = self.app.scheduler.stop_all_scheduled_macros
 
         # Register macros
         for macro in macros:
+            if macro.disabled:
+                continue  # Skip disabled macros
             hotkey = macro.hotkey
             keys = [self.normalize_key_name(k.strip()) for k in hotkey.split('+')]
             key_set = frozenset(keys)
@@ -476,7 +481,8 @@ class Scheduler(threading.Thread):
                 for scheduled_task in self.scheduled_tasks[:]:
                     if scheduled_task['next_run'] <= now:
                         macro = scheduled_task['macro']
-                        self.app.task_queue.put(macro)
+                        if not macro.disabled:  # Only run if macro is enabled
+                            self.app.task_queue.put(macro)
                         if scheduled_task['repeat_interval'] is not None:
                             scheduled_task['next_run'] = now + scheduled_task['repeat_interval']
                         else:
@@ -491,25 +497,29 @@ class Scheduler(threading.Thread):
                 'next_run': next_run,
                 'repeat_interval': repeat_interval
             })
-
-    def schedule_macro(self, macro, delay, repeat_interval=None):
-        next_run = time.time() + delay
-        with self.lock:
-            self.scheduled_tasks.append({
-                'macro': macro,
-                'next_run': next_run,
-                'repeat_interval': repeat_interval
-            })
             self.app.update_scheduled_macros()  # Update the scheduled macros display
 
     def stop(self):
         self.running = False
 
-    def stop_all(self):
+    def stop_all_scheduled_macros(self):
         with self.lock:
             self.scheduled_tasks.clear()
         self.app.update_scheduled_macros()
-        self.app.log("All scheduled macros have been stopped.")
+        self.app.log("All scheduled macros have been stopped.", 'error')
+
+    def toggle_macro_scheduling(self, macro):
+        with self.lock:
+            for task in self.scheduled_tasks:
+                if task['macro'] == macro:
+                    self.scheduled_tasks.remove(task)
+                    self.app.log(f"Scheduling for macro '{macro.name}' has been disabled.", 'error')
+                    return
+            # If not found, schedule it
+            delay = parse_time(macro.schedule)
+            repeat_interval = parse_time(macro.repeat_interval) if macro.repeat_interval else None
+            self.schedule_macro(macro, delay, repeat_interval)
+            self.app.log(f"Scheduling for macro '{macro.name}' has been enabled.", 'success')
 
 
 class MacroApp(tk.Tk):
@@ -612,22 +622,27 @@ class MacroApp(tk.Tk):
         return load_macros(self)
 
     def register_hotkeys(self):
+        # Clear existing Treeview items to prevent duplication
+        self.macro_list.delete(*self.macro_list.get_children())
+
         self.macro_list_data = self.load_config_macros()
         self.hotkey_manager.register_hotkeys(self.macro_list_data)
 
-        # Schedule macros that have a schedule
-        for macro in self.macro_list_data:
-            if macro.schedule:
-                delay = parse_time(macro.schedule)
-                repeat_interval = parse_time(macro.repeat_interval) if macro.repeat_interval else None
-                self.scheduler.schedule_macro(macro, delay, repeat_interval)
+        # Populate the treeview with existing macros including 'Enabled' status
+        for macro in self.config['macros']:
+            enabled = 'Enabled' if not macro.get('disabled', False) else 'Disabled'
+            call_count = macro.get('call_count', 0) if macro.get('is_dose_macro', False) else ""
+            reset_text = 'Reset' if macro.get('is_dose_macro', False) else ""
+            doses = macro['dose_count'] if macro.get('is_dose_macro', False) else "N/A"
+            tag = 'enabled' if not macro.get('disabled', False) else 'disabled'
+            self.macro_list.insert('', 'end',
+                                   values=(macro['name'], macro['hotkey'], enabled,
+                                           call_count, reset_text, doses),
+                                   tags=(tag,))
 
     def create_widgets(self):
-        self.style = ttk.Style()
-        self.style.configure('TNotebook.Tab', padding=(12, 8))
-        self.style.configure('TButton', font=('Arial', 10))
-        self.style.configure('Treeview.Heading', font=('Arial', 10, 'bold'))
-        self.style.configure('Treeview', font=('Arial', 10))
+        # Create the large status indicator at the top
+        self.create_status_indicator()
 
         # Toolbar Frame
         toolbar_frame = ttk.Frame(self)
@@ -636,11 +651,6 @@ class MacroApp(tk.Tk):
         # Enable/Disable Macros Button
         self.toggle_macros_button = ttk.Button(toolbar_frame, text="Disable Macros", command=self.toggle_macros)
         self.toggle_macros_button.pack(side='left', padx=5, pady=5)
-
-        # Add Red/Green Indicator for Macros Enabled/Disabled
-        self.macros_status_indicator = tk.Canvas(toolbar_frame, width=20, height=20, highlightthickness=0)
-        self.update_macros_status_indicator()
-        self.macros_status_indicator.pack(side='left', padx=5, pady=5)
 
         # Disable Scheduling Button
         self.toggle_scheduling_button = ttk.Button(toolbar_frame, text="Disable Scheduling",
@@ -710,16 +720,15 @@ class MacroApp(tk.Tk):
         self.details_text.tag_configure('success', foreground='green')
         self.details_text.tag_configure('timing', foreground='purple')
 
-        # Status Bar Frame
-        status_frame = ttk.Frame(self)
-        status_frame.pack(side='bottom', fill='x')
+        self.status_frame = ttk.Frame(self)
+        self.status_frame.pack(side='bottom', fill='x')
 
         # Mouse position label
-        self.mouse_pos_label = ttk.Label(status_frame, text="Mouse Position: (0, 0)")
+        self.mouse_pos_label = ttk.Label(self.status_frame, text="Mouse Position: (0, 0)")
         self.mouse_pos_label.pack(side='left', padx=5)
 
         # ETA Label
-        self.eta_label = ttk.Label(status_frame, text="Estimated Time Remaining: N/A")
+        self.eta_label = ttk.Label(self.status_frame, text="Estimated Time Remaining: N/A")
         self.eta_label.pack(side='right', padx=5)
 
         # Macros tab content
@@ -727,6 +736,31 @@ class MacroApp(tk.Tk):
 
         # Settings tab content
         self.create_settings_tab()
+
+        # Set pyautogui pause to 0.025 to eliminate default delay
+        pyautogui.PAUSE = 0.025
+
+        # Configurable delay between tasks
+        self.task_execution_delay = self.config.get('task_execution_delay', 0.1)
+        # Task queue and executor
+        self.task_queue = queue.Queue()
+        self.running_macro_lock = threading.Lock()
+        self.task_executor = TaskExecutor(self.task_queue, self.task_execution_delay, self)
+        self.task_executor.start()
+
+        # Scheduler
+        self.scheduler = Scheduler(self)
+        self.scheduler.start()
+
+        # Update mouse position and register hotkeys
+        self.update_mouse_position()
+        self.register_hotkeys()
+
+        # Periodically save config if required
+        self.config_save_required = False  # Initialize flag
+        self.after(5000, self.periodic_save_config)
+
+        self.log_details = {}  # Initialize log details storage
 
     def on_summary_select(self, event):
         selected_item = self.summary_tree.selection()
@@ -764,50 +798,6 @@ class MacroApp(tk.Tk):
                 self.details_text.tag_add('action', f"{index} linestart", f"{index} lineend")
             index += 1
 
-    def create_macros_tab(self):
-        # Treeview to display macros
-        columns = ('Name', 'Hotkey', 'Doses', 'Call Count', 'Reset')
-        self.macro_list = ttk.Treeview(self.macro_frame,
-                                       columns=columns,
-                                       show='headings', height=15)
-        for col in columns:
-            self.macro_list.heading(col, text=col)
-            self.macro_list.column(col, width=100, anchor='center')
-        self.macro_list.pack(expand=True, fill='both', padx=5, pady=5)
-
-        # Populate the treeview with existing macros
-        for macro in self.config['macros']:
-            doses = macro['dose_count'] if macro.get('is_dose_macro', False) else "N/A"
-            call_count = macro.get('call_count', 0) if macro.get('is_dose_macro', False) else ""
-            reset_text = 'Reset' if macro.get('is_dose_macro', False) else ""
-            self.macro_list.insert('', 'end',
-                                   values=(macro['name'], macro['hotkey'], doses, call_count, reset_text))
-
-        # Bind double-click event
-        self.macro_list.bind('<Double-1>', self.on_macro_double_click)
-        # Bind click event
-        self.macro_list.bind('<ButtonRelease-1>', self.on_macro_click)
-
-        # Buttons
-        btn_frame = ttk.Frame(self.macro_frame)
-        btn_frame.pack(pady=10)
-
-        add_macro_btn = ttk.Button(btn_frame, text="Add Macro", command=self.add_macro)
-        add_macro_btn.pack(side='left', padx=5)
-
-        edit_macro_btn = ttk.Button(btn_frame, text="Edit Macro", command=self.edit_macro)
-        edit_macro_btn.pack(side='left', padx=5)
-
-        copy_macro_btn = ttk.Button(btn_frame, text="Copy Macro", command=self.copy_macro)
-        copy_macro_btn.pack(side='left', padx=5)
-
-        del_macro_btn = ttk.Button(btn_frame, text="Delete Macro", command=self.delete_macro)
-        del_macro_btn.pack(side='left', padx=5)
-
-        # Add "Reset All" Button
-        reset_all_btn = ttk.Button(btn_frame, text="Reset All", command=self.reset_all_macros)
-        reset_all_btn.pack(side='left', padx=5)
-
     def on_macro_double_click(self, event):
         self.edit_macro()
 
@@ -825,6 +815,67 @@ class MacroApp(tk.Tk):
                 self.save_config()
                 self.log(f"Call count for macro '{macro_name}' has been reset.")
                 self.update_macro_call_count(macro)
+
+    def on_macro_list_click(self, event):
+        """Handles clicks on the 'Enabled' column to toggle macro's enabled status."""
+        region = self.macro_list.identify('region', event.x, event.y)
+        if region != 'cell':
+            return
+        column = self.macro_list.identify_column(event.x)
+        if column != '#3':  # 'Enabled' is the third column
+            return
+        row = self.macro_list.identify_row(event.y)
+        if not row:
+            return
+        macro_name = self.macro_list.item(row, 'values')[0]
+        macro = next((m for m in self.macro_list_data if m.name == macro_name), None)
+        if macro:
+            macro.disabled = not macro.disabled
+            # Update config
+            macro_config = next((c for c in self.config['macros'] if c['name'] == macro_name), None)
+            if macro_config:
+                macro_config['disabled'] = macro.disabled
+            # Update Treeview
+            enabled = 'Enabled' if not macro.disabled else 'Disabled'
+            self.macro_list.set(row, 'Enabled', enabled)
+            # Update tags for row coloring
+            if macro.disabled:
+                self.macro_list.item(row, tags=('disabled',))
+            else:
+                self.macro_list.item(row, tags=('enabled',))
+            # Save config
+            self.save_config()
+            # Register hotkeys again
+            self.register_hotkeys()
+            # Log the action
+            status = "disabled" if macro.disabled else "enabled"
+            self.log(f"Macro '{macro_name}' has been {status}.", 'success')
+
+    def create_status_indicator(self):
+        """Creates a large status indicator at the top of the UI."""
+        # Create a frame for the status indicator
+        status_frame = ttk.Frame(self)
+        status_frame.pack(side='top', fill='x', padx=5, pady=5)
+
+        # Create a Canvas for the status indicator
+        self.status_indicator_canvas = tk.Canvas(status_frame, height=50, bg='grey', highlightthickness=0)
+        self.status_indicator_canvas.pack(fill='x')
+
+        # Initial status
+        self.update_macros_status_indicator()
+
+        # Bind to resize event to adjust the rectangle and text
+        self.status_indicator_canvas.bind('<Configure>', self.on_status_indicator_resize)
+
+    def update_macro_enabled_color(self, row, disabled):
+        """Updates the background color of the 'Enabled' column based on status."""
+        if disabled:
+            self.macro_list.item(row, tags=('disabled',))
+        else:
+            self.macro_list.item(row, tags=('enabled',))
+        # Define tag colors
+        self.macro_list.tag_configure('enabled', background='lightgreen')
+        self.macro_list.tag_configure('disabled', background='lightcoral')
 
     def create_settings_tab(self):
         settings_canvas = tk.Canvas(self.settings_frame)
@@ -1091,6 +1142,7 @@ class MacroApp(tk.Tk):
         MacroEditor(self, new_macro_config, is_copy=True)
 
     def toggle_macros(self):
+        """Toggles the macros on/off and updates the status indicator."""
         self.macros_enabled = not self.macros_enabled
         if self.macros_enabled:
             self.toggle_macros_button.config(text="Disable Macros")
@@ -1098,16 +1150,18 @@ class MacroApp(tk.Tk):
         else:
             self.toggle_macros_button.config(text="Enable Macros")
             self.log("Macros disabled via killswitch.", 'error')
+        self.update_macros_status_indicator()
 
     def update_macro_call_count(self, macro):
-        # Find the macro in the treeview and update its 'Doses' and 'Call Count' columns
+        # Find the macro in the treeview and update its 'Enabled', 'Call Count', 'Reset', and 'Doses' columns
         for item in self.macro_list.get_children():
             values = self.macro_list.item(item, 'values')
             if values[0] == macro.name:
+                enabled = 'Enabled' if not macro.disabled else 'Disabled'
                 doses = macro.dose_count if macro.is_dose_macro else "N/A"
                 call_count = macro.call_count if macro.is_dose_macro else ""
                 reset_text = 'Reset' if macro.is_dose_macro else ""
-                self.macro_list.item(item, values=(macro.name, macro.hotkey, doses, call_count, reset_text))
+                self.macro_list.item(item, values=(macro.name, macro.hotkey, enabled, call_count, reset_text, doses))
                 break
 
     def update_eta_tracker(self, estimated_time_remaining):
@@ -1136,23 +1190,96 @@ class MacroApp(tk.Tk):
         for macro in self.macro_list_data:
             self.update_macro_call_count(macro)
 
-    def update_macros_status_indicator(self):
-        self.macros_status_indicator.delete("all")
-        if self.macros_enabled:
-            color = 'green'
-        else:
-            color = 'red'
-        self.macros_status_indicator.create_oval(5, 5, 15, 15, fill=color)
+    def create_macros_tab(self):
+        """Creates the Macros tab with a sortable, enabled/disabled Treeview."""
+        # Define columns with 'Doses' as the rightmost column
+        columns = ('Name', 'Hotkey', 'Enabled', 'Call Count', 'Reset', 'Doses')
 
-    def toggle_macros(self):
-        self.macros_enabled = not self.macros_enabled
-        if self.macros_enabled:
-            self.toggle_macros_button.config(text="Disable Macros")
-            self.log("Macros enabled.", 'success')
-        else:
-            self.toggle_macros_button.config(text="Enable Macros")
-            self.log("Macros disabled via killswitch.", 'error')
+        self.macro_list = ttk.Treeview(self.macro_frame,
+                                       columns=columns,
+                                       show='headings', height=15)
+        for col in columns:
+            self.macro_list.heading(col, text=col,
+                                    command=lambda _col=col: self.sort_treeview(self.macro_list, _col, False))
+            self.macro_list.column(col, width=100, anchor='center')
+        self.macro_list.pack(expand=True, fill='both', padx=5, pady=5)
+
+        # Configure tags for row coloring
+        self.macro_list.tag_configure('enabled', background='lightgreen')
+        self.macro_list.tag_configure('disabled', background='lightcoral')
+
+        # Populate the treeview with existing macros including 'Enabled' status
+        for macro in self.config['macros']:
+            enabled = 'Enabled' if not macro.get('disabled', False) else 'Disabled'
+            call_count = macro.get('call_count', 0) if macro.get('is_dose_macro', False) else ""
+            reset_text = 'Reset' if macro.get('is_dose_macro', False) else ""
+            doses = macro['dose_count'] if macro.get('is_dose_macro', False) else "N/A"
+            tag = 'enabled' if not macro.get('disabled', False) else 'disabled'
+            self.macro_list.insert('', 'end',
+                                   values=(macro['name'], macro['hotkey'], enabled,
+                                           call_count, reset_text, doses),
+                                   tags=(tag,))
+
+        # Bind the click event to handle toggling 'Enabled' status
+        self.macro_list.bind('<Button-1>', self.on_macro_list_click)
+
+        # Bind double-click event
+        self.macro_list.bind('<Double-1>', self.on_macro_double_click)
+
+        # Buttons
+        btn_frame = ttk.Frame(self.macro_frame)
+        btn_frame.pack(pady=10)
+
+        add_macro_btn = ttk.Button(btn_frame, text="Add Macro", command=self.add_macro)
+        add_macro_btn.pack(side='left', padx=5)
+
+        edit_macro_btn = ttk.Button(btn_frame, text="Edit Macro", command=self.edit_macro)
+        edit_macro_btn.pack(side='left', padx=5)
+
+        copy_macro_btn = ttk.Button(btn_frame, text="Copy Macro", command=self.copy_macro)
+        copy_macro_btn.pack(side='left', padx=5)
+
+        del_macro_btn = ttk.Button(btn_frame, text="Delete Macro", command=self.delete_macro)
+        del_macro_btn.pack(side='left', padx=5)
+
+        # Add "Reset All" Button
+        reset_all_btn = ttk.Button(btn_frame, text="Reset All", command=self.reset_all_macros)
+        reset_all_btn.pack(side='left', padx=5)
+
+    def update_macros_status_indicator(self):
+        """Updates the status indicator's color and text based on macros status."""
+        color = 'green' if self.macros_enabled else 'red'
+        self.status_indicator_canvas.delete("all")
+        self.status_indicator_canvas.create_rectangle(0, 0, self.status_indicator_canvas.winfo_width(), 50, fill=color)
+        status_text = "Macros Enabled" if self.macros_enabled else "Macros Disabled"
+        self.status_indicator_canvas.create_text(self.status_indicator_canvas.winfo_width() / 2, 25,
+                                                 text=status_text,
+                                                 fill='white', font=('Arial', 20, 'bold'))
+
+    def on_status_indicator_resize(self, event):
+        """Handles the resizing of the status indicator."""
         self.update_macros_status_indicator()
+
+    def sort_treeview(self, tree, col, reverse):
+        """Sorts the Treeview by the given column without duplicating items."""
+        try:
+            # Attempt to sort as float
+            l = [(float(tree.set(k, col)), k) for k in tree.get_children('')]
+        except ValueError:
+            # If not float, sort as string
+            l = [(tree.set(k, col), k) for k in tree.get_children('')]
+
+        # Sort the list
+        l.sort(reverse=reverse)
+
+        # Rearrange items in sorted order
+        for index, (val, k) in enumerate(l):
+            tree.move(k, '', index)
+
+        # Toggle the sort order for next click
+        tree.heading(col, command=lambda: self.sort_treeview(tree, col, not reverse))
+
+
 
 
 class MacroEditor(tk.Toplevel):
@@ -1895,3 +2022,4 @@ if __name__ == "__main__":
     app = MacroApp()
     # Run the GUI in the main thread
     app.mainloop()
+

@@ -20,7 +20,8 @@
                 },
                 {
                     "type": "press_specific_panel_key",
-                    "panel": "Prayer"
+                    "panel": "Prayer",
+                    "annotation": "pray"
                 },
                 {
                     "type": "click",

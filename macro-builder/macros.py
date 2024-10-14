@@ -874,7 +874,7 @@ class MacroApp(tk.Tk):
         else:
             self.macro_list.item(row, tags=('enabled',))
         # Define tag colors
-        self.macro_list.tag_configure('enabled', background='lightgreen')
+        self.macro_list.tag_configure('enabled', background='white')
         self.macro_list.tag_configure('disabled', background='lightcoral')
 
     def create_settings_tab(self):
@@ -1205,7 +1205,7 @@ class MacroApp(tk.Tk):
         self.macro_list.pack(expand=True, fill='both', padx=5, pady=5)
 
         # Configure tags for row coloring
-        self.macro_list.tag_configure('enabled', background='lightgreen')
+        self.macro_list.tag_configure('enabled', background='white')
         self.macro_list.tag_configure('disabled', background='lightcoral')
 
         # Populate the treeview with existing macros including 'Enabled' status

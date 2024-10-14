@@ -233,7 +233,7 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1,
-            "disabled": false
+            "disabled": true
         },
         {
             "name": "panic tele",
@@ -1022,7 +1022,7 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1,
-            "disabled": false
+            "disabled": true
         },
         {
             "name": "nwe",

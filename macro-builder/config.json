@@ -11,7 +11,7 @@
     "macros": [
         {
             "name": "prayer - wilderness flick",
-            "hotkey": "n",
+            "hotkey": "ctrl + 1",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
@@ -47,6 +47,9 @@
             ],
             "is_dose_macro": false,
             "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": false,
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1
@@ -61,15 +64,15 @@
                     "positions": [
                         [
                             2042,
-                            1268
+                            1280
                         ],
                         [
-                            2133,
-                            1269
+                            2126,
+                            1272
                         ],
                         [
-                            2214,
-                            1261
+                            2215,
+                            1273
                         ]
                     ],
                     "modifiers": []
@@ -83,6 +86,7 @@
             "is_loop_macro": false,
             "schedule": null,
             "repeat_interval": null,
+            "disabled": false,
             "dose_count": 4,
             "call_count": 0,
             "current_position_index": 0,
@@ -120,7 +124,8 @@
             "is_loop_macro": false,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1
+            "loop_count": 1,
+            "disabled": false
         },
         {
             "name": "prayer - melee",
@@ -154,7 +159,8 @@
             "is_loop_macro": false,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1
+            "loop_count": 1,
+            "disabled": false
         },
         {
             "name": "prayer - mage",
@@ -188,7 +194,8 @@
             "is_loop_macro": false,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1
+            "loop_count": 1,
+            "disabled": false
         },
         {
             "name": "spell - ancient - barrage",
@@ -222,7 +229,8 @@
             "is_loop_macro": false,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1
+            "loop_count": 1,
+            "disabled": false
         },
         {
             "name": "panic tele",
@@ -252,7 +260,8 @@
             "is_loop_macro": false,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1
+            "loop_count": 1,
+            "disabled": false
         },
         {
             "name": "eat - brew",
@@ -263,24 +272,20 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1954,
-                            1125
-                        ],
-                        [
-                            2041,
-                            1124
-                        ],
-                        [
-                            2132,
-                            1130
+                            1959,
+                            1053
                         ],
                         [
                             1958,
-                            1200
+                            1127
                         ],
                         [
-                            2053,
-                            1207
+                            2042,
+                            1126
+                        ],
+                        [
+                            2042,
+                            1060
                         ]
                     ],
                     "modifiers": []
@@ -294,6 +299,7 @@
             "is_loop_macro": false,
             "schedule": null,
             "repeat_interval": null,
+            "disabled": false,
             "dose_count": 4,
             "call_count": 0,
             "current_position_index": 0,
@@ -347,7 +353,8 @@
             "is_loop_macro": false,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1
+            "loop_count": 1,
+            "disabled": false
         },
         {
             "name": "swap2",
@@ -397,7 +404,8 @@
             "is_loop_macro": false,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1
+            "loop_count": 1,
+            "disabled": false
         },
         {
             "name": "prayer - augury/rigor",
@@ -436,7 +444,8 @@
             "dose_count": 1,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1
+            "loop_count": 1,
+            "disabled": false
         },
         {
             "name": "melee spec",
@@ -488,7 +497,8 @@
             "repeat_interval": null,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1
+            "loop_count": 1,
+            "disabled": false
         },
         {
             "name": "SPELL BIND",
@@ -526,7 +536,8 @@
             "is_loop_macro": false,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1
+            "loop_count": 1,
+            "disabled": false
         },
         {
             "name": "SPELL TB",
@@ -562,7 +573,8 @@
             ],
             "is_dose_macro": false,
             "call_count": 0,
-            "current_position_index": 0
+            "current_position_index": 0,
+            "disabled": false
         },
         {
             "name": "loadout_gen",
@@ -848,7 +860,8 @@
             "is_loop_macro": false,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1
+            "loop_count": 1,
+            "disabled": false
         },
         {
             "name": "clean herb",
@@ -970,7 +983,8 @@
             "is_loop_macro": false,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1
+            "loop_count": 1,
+            "disabled": false
         },
         {
             "name": "spell - crumble undead",
@@ -1004,19 +1018,21 @@
             "is_loop_macro": false,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1
+            "loop_count": 1,
+            "disabled": false
         },
         {
             "name": "nwe",
-            "hotkey": "a",
+            "hotkey": "space",
             "actions": [],
             "is_dose_macro": false,
-            "is_loop_macro": true,
+            "is_loop_macro": false,
             "schedule": null,
             "repeat_interval": null,
+            "disabled": false,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": -1
+            "loop_count": 1
         },
         {
             "name": "spell - fire surge",
@@ -1054,7 +1070,8 @@
             "is_loop_macro": true,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": -1
+            "loop_count": -1,
+            "disabled": false
         }
     ],
     "mouse_move_duration": 0.01,

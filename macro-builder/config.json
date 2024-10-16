@@ -1,5 +1,5 @@
 {
-    "interface_switch_time": 0.1,
+    "interface_switch_time": 0.12,
     "action_registration_time_min": 0.02,
     "action_registration_time_max": 0.02,
     "panel_key": "q",
@@ -51,7 +51,7 @@
             "is_loop_macro": false,
             "schedule": null,
             "repeat_interval": null,
-            "disabled": true,
+            "disabled": false,
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1
@@ -364,12 +364,12 @@
             ],
             "is_dose_macro": false,
             "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": true,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1,
-            "disabled": false,
-            "schedule": null,
-            "repeat_interval": null
+            "loop_count": 1
         },
         {
             "name": "swap2",
@@ -1152,7 +1152,8 @@
     "mouse_move_duration": 0.01,
     "wait_times": {
         "tick_time": 0.6,
-        "4-tick": 2.4
+        "4-tick": 2.4,
+        "3-tick": 0.0
     },
     "task_execution_delay": 0.0
 }

@@ -16,7 +16,8 @@ from pynput import keyboard
 class HotkeyManager:
     def __init__(self, app):
         self.app = app
-        self.hotkeys = {}
+        self.builtin_hotkeys = {}
+        self.macro_hotkeys = {}
         self.listener = None
         self.current_keys = set()
         self.pressed_hotkeys = set()
@@ -57,31 +58,31 @@ class HotkeyManager:
         # Stop any existing listener
         if self.listener:
             self.listener.stop()
+            self.listener = None  # Ensure listener is reset
 
         # Clear existing hotkeys
-        self.hotkeys.clear()
+        self.builtin_hotkeys.clear()
+        self.macro_hotkeys.clear()
 
-        # Add hotkey to toggle macros on/off (F1)
-        self.hotkeys[frozenset(['f1'])] = self.app.toggle_macros
+        # Add built-in hotkeys
+        self.builtin_hotkeys[frozenset(['f1'])] = self.app.toggle_macros
+        self.builtin_hotkeys[frozenset(['f2'])] = self.app.scheduler.stop_all_scheduled_macros
 
-        # Add hotkey to stop all scheduled macros (F2)
-        self.hotkeys[frozenset(['f2'])] = self.app.scheduler.stop_all_scheduled_macros
-
-        # Register macros
+        # Register macro-specific hotkeys
         for macro in macros:
             if macro.disabled:
                 continue  # Skip disabled macros
             hotkey = macro.hotkey
             keys = [self.normalize_key_name(k.strip()) for k in hotkey.split('+')]
             key_set = frozenset(keys)
-            self.hotkeys[key_set] = macro
+            self.macro_hotkeys[key_set] = macro
 
         # Start the listener in a separate thread
         self.listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
         self.listener.start()
 
     def on_press(self, key):
-        if not self.app.macros_enabled or self.app.is_recording_hotkeys:
+        if self.app.is_recording_hotkeys:
             return
 
         try:
@@ -96,14 +97,23 @@ class HotkeyManager:
         except AttributeError:
             pass
 
-        for hotkey_keys, action in self.hotkeys.items():
+        # First, check and handle built-in hotkeys
+        for hotkey_keys, action in self.builtin_hotkeys.items():
             if hotkey_keys.issubset(self.current_keys):
                 if hotkey_keys not in self.pressed_hotkeys:
                     self.pressed_hotkeys.add(hotkey_keys)
                     if isinstance(action, Macro):
-                        threading.Thread(target=action.toggle).start()
+                        self.app.task_queue.put(action)
                     elif callable(action):
-                        threading.Thread(target=action).start()
+                        self.app.task_queue.put(action)
+
+        # Then, handle macro-specific hotkeys only if macros are enabled
+        if self.app.macros_enabled:
+            for hotkey_keys, macro in self.macro_hotkeys.items():
+                if hotkey_keys.issubset(self.current_keys):
+                    if hotkey_keys not in self.pressed_hotkeys:
+                        self.pressed_hotkeys.add(hotkey_keys)
+                        self.app.task_queue.put(macro)
 
     def on_release(self, key):
         try:
@@ -126,10 +136,14 @@ class HotkeyManager:
         self.pressed_hotkeys -= to_remove
 
     def disable_hotkeys(self):
-        self.hotkeys_enabled = False
+        if self.listener:
+            self.listener.stop()
+            self.listener = None
 
     def enable_hotkeys(self):
-        self.hotkeys_enabled = True
+        if not self.listener:
+            self.listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
+            self.listener.start()
 
 
 # Macro Class
@@ -430,7 +444,7 @@ def load_macros(app):
             delay = parse_time(macro.schedule)
             if delay is not None:
                 repeat_interval = parse_time(macro.repeat_interval) if macro.repeat_interval else None
-                app.scheduler.schedule_macro(macro, delay, repeat_interval)
+                # app.scheduler.schedule_macro(macro, delay, repeat_interval)  # commendted due to error -> broken
             else:
                 app.log(f"Invalid schedule format for macro '{macro.name}'.")
 
@@ -458,36 +472,49 @@ class TaskExecutor(threading.Thread):
         self.task_queue = task_queue
         self.delay_between_tasks = delay_between_tasks
         self.app = app
-        self.daemon = True
+        self.daemon = True  # Ensure thread exits when main program does
         self.running = True
 
     def run(self):
         while self.running:
-            macro = self.task_queue.get()
-            if macro is None:
+            try:
+                # Use a timeout to periodically check the running flag
+                task = self.task_queue.get(timeout=1)
+            except queue.Empty:
+                continue  # No task received, continue checking
+
+            if task is None:
+                # Sentinel value received, exit the loop
                 break
-            with self.app.running_macro_lock:
-                macro_thread = threading.Thread(target=macro.run_macro)
-                macro_thread.start()
-                macro_thread.join()
+
+            try:
+                with self.app.running_macro_lock:
+                    if hasattr(task, 'run_macro') and callable(getattr(task, 'run_macro')):
+                        task.run_macro()  # Execute Macro instances
+                    elif callable(task):
+                        task()  # Execute standalone functions
+                    else:
+                        self.app.log(f"Unknown task type: {type(task)}", 'error')
+            except Exception as e:
+                self.app.log(f"Exception during task execution: {e}", 'error')
+
             self.task_queue.task_done()
             time.sleep(self.delay_between_tasks)
 
     def stop(self):
         self.running = False
-        # To unblock the queue.get() call
-        self.task_queue.put(None)
+        self.task_queue.put(None)  # Send sentinel to unblock the queue.get()
 
 
 class Scheduler(threading.Thread):
     def __init__(self, app):
         super().__init__()
         self.app = app
-        self.daemon = True
+        self.daemon = True  # Ensure thread exits when main program does
         self.scheduled_tasks = []
         self.lock = threading.Lock()
         self.running = True
-        self.enabled = True  # Add this flag
+        self.enabled = True  # Flag to enable/disable scheduling
 
     def run(self):
         while self.running:
@@ -495,17 +522,31 @@ class Scheduler(threading.Thread):
                 time.sleep(1)
                 continue
             now = time.time()
+            next_run_time = None
+
             with self.lock:
                 for scheduled_task in self.scheduled_tasks[:]:
                     if scheduled_task['next_run'] <= now:
                         macro = scheduled_task['macro']
-                        if not macro.disabled:  # Only run if macro is enabled
+                        if not macro.disabled:
                             self.app.task_queue.put(macro)
                         if scheduled_task['repeat_interval'] is not None:
                             scheduled_task['next_run'] = now + scheduled_task['repeat_interval']
                         else:
                             self.scheduled_tasks.remove(scheduled_task)
-            time.sleep(1)
+                    else:
+                        if next_run_time is None or scheduled_task['next_run'] < next_run_time:
+                            next_run_time = scheduled_task['next_run']
+
+            # Calculate sleep time based on the next task to run
+            if next_run_time:
+                sleep_time = max(0, next_run_time - time.time())
+                # Limit sleep_time to avoid long sleeps in case of clock changes
+                sleep_time = min(sleep_time, 60)
+            else:
+                sleep_time = 1  # Default sleep time if no tasks are scheduled
+
+            time.sleep(sleep_time)
 
     def schedule_macro(self, macro, delay, repeat_interval=None):
         next_run = time.time() + delay
@@ -516,9 +557,7 @@ class Scheduler(threading.Thread):
                 'repeat_interval': repeat_interval
             })
             self.app.update_scheduled_macros()  # Update the scheduled macros display
-
-    def stop(self):
-        self.running = False
+        self.app.log(f"Macro '{macro.name}' has been scheduled to run in {delay} seconds.", 'success')
 
     def stop_all_scheduled_macros(self):
         with self.lock:
@@ -536,16 +575,24 @@ class Scheduler(threading.Thread):
             # If not found, schedule it
             delay = parse_time(macro.schedule)
             repeat_interval = parse_time(macro.repeat_interval) if macro.repeat_interval else None
-            self.schedule_macro(macro, delay, repeat_interval)
-            self.app.log(f"Scheduling for macro '{macro.name}' has been enabled.", 'success')
+            if delay is not None:
+                self.schedule_macro(macro, delay, repeat_interval)
+                self.app.log(f"Scheduling for macro '{macro.name}' has been enabled.", 'success')
+            else:
+                self.app.log(f"Invalid schedule format for macro '{macro.name}'.", 'error')
+
+    def stop(self):
+        """Stops the Scheduler thread gracefully."""
+        self.running = False
 
 
 class MacroApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Python Macro Application")
-        self.geometry("850x700")
+        self.title("OSRS Macros")
+        self.geometry("1024x720")
         self.config_load()
+        self.wait_times = self.config.get("wait_times", {"tick_time": 0.6})
 
         # Timing configurations
         self.interface_switch_time = self.config.get("interface_switch_time", 0.02)
@@ -608,37 +655,7 @@ class MacroApp(tk.Tk):
         Registers hotkeys without reloading Macro instances to preserve their state.
         This method updates the hotkey mappings based on the current state of macros.
         """
-        # Stop any existing listener to prevent multiple listeners running
-        if self.hotkey_manager.listener:
-            self.hotkey_manager.listener.stop()
-
-        # Clear existing hotkeys
-        self.hotkey_manager.hotkeys.clear()
-
-        # Add hotkey to toggle macros on/off (F1)
-        self.hotkey_manager.hotkeys[frozenset(['f1'])] = self.toggle_macros
-
-        # Add hotkey to stop all scheduled macros (F2)
-        self.hotkey_manager.hotkeys[frozenset(['f2'])] = self.scheduler.stop_all_scheduled_macros
-
-        # Sort macros alphabetically by name
-        sorted_macros = sorted(self.macro_list_data, key=lambda m: m.name.lower())
-
-        # Register each enabled macro's hotkey
-        for macro in sorted_macros:
-            if macro.disabled:
-                continue  # Skip disabled macros
-            hotkey = macro.hotkey
-            keys = [self.hotkey_manager.normalize_key_name(k.strip()) for k in hotkey.split('+')]
-            key_set = frozenset(keys)
-            self.hotkey_manager.hotkeys[key_set] = macro
-
-        # Start the hotkey listener in a separate thread
-        self.hotkey_manager.listener = keyboard.Listener(
-            on_press=self.hotkey_manager.on_press,
-            on_release=self.hotkey_manager.on_release
-        )
-        self.hotkey_manager.listener.start()
+        self.hotkey_manager.register_hotkeys(self.macro_list_data)
 
     def toggle_macro_enabled_state(self, macro):
         """
@@ -733,8 +750,16 @@ class MacroApp(tk.Tk):
         # Create the large status indicator at the top
         self.create_status_indicator()
 
+        # Create a vertical PanedWindow to separate the main area and the logs
+        main_paned_window = ttk.PanedWindow(self, orient=tk.VERTICAL)
+        main_paned_window.pack(fill='both', expand=True)
+
+        # Top pane: Toolbar and Notebook (Macros and Settings)
+        top_frame = ttk.Frame(main_paned_window)
+        main_paned_window.add(top_frame, weight=3)
+
         # Toolbar Frame
-        toolbar_frame = ttk.Frame(self)
+        toolbar_frame = ttk.Frame(top_frame)
         toolbar_frame.pack(side='top', fill='x')
 
         # Enable/Disable Macros Button
@@ -760,7 +785,7 @@ class MacroApp(tk.Tk):
         self.mouse_pos_label.pack(side='right', padx=5, pady=5)
 
         # Notebook for tabs
-        self.notebook = ttk.Notebook(self)
+        self.notebook = ttk.Notebook(top_frame)
         self.notebook.pack(expand=True, fill='both')
 
         # Macros tab
@@ -771,89 +796,21 @@ class MacroApp(tk.Tk):
         self.settings_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.settings_frame, text='Settings')
 
-        # Log Display Frame
-        log_frame = ttk.Frame(self)
-        log_frame.pack(side='bottom', fill='both', expand=True)
-
-        # Split the log frame into summary and detailed logs
-        log_paned_window = ttk.PanedWindow(log_frame, orient=tk.HORIZONTAL)
-        log_paned_window.pack(fill='both', expand=True)
-
-        # Summary Log Frame
-        self.summary_log_frame = ttk.Frame(log_paned_window)
-        log_paned_window.add(self.summary_log_frame, weight=1)
-
-        # Detailed Log Frame
-        self.details_log_frame = ttk.Frame(log_paned_window)
-        log_paned_window.add(self.details_log_frame, weight=1)
-
-        # Set the sash position to make it a 50-50 split after the window is fully loaded
-        self.after(100, lambda: log_paned_window.sashpos(0, self.winfo_width() // 2))
-
-        # Treeview for Summary Log
-        columns = ('Timestamp', 'Macro', 'Total Time')
-        self.summary_tree = ttk.Treeview(self.summary_log_frame, columns=columns, show='headings', height=10)
-        for col in columns:
-            self.summary_tree.heading(col, text=col)
-            self.summary_tree.column(col, width=100, anchor='center')
-        self.summary_tree.pack(expand=True, fill='both', padx=5, pady=5)
-
-        # Bind selection event
-        self.summary_tree.bind('<<TreeviewSelect>>', self.on_summary_select)
-
-        # ScrolledText for Detailed Log
-        self.details_text = scrolledtext.ScrolledText(self.details_log_frame, wrap='word', font=('Consolas', 10))
-        self.details_text.pack(expand=True, fill='both', padx=5, pady=5)
-
-        # Configure tags for coloring in details log
-        self.details_text.tag_configure('timestamp', foreground='grey')
-        self.details_text.tag_configure('macro_name', foreground='blue')
-        self.details_text.tag_configure('action', foreground='black')
-        self.details_text.tag_configure('error', foreground='red')
-        self.details_text.tag_configure('success', foreground='green')
-        self.details_text.tag_configure('timing', foreground='purple')
-
-        self.status_frame = ttk.Frame(self)
-        self.status_frame.pack(side='bottom', fill='x')
-
-        # Mouse position label
-        self.mouse_pos_label = ttk.Label(self.status_frame, text="Mouse Position: (0, 0)")
-        self.mouse_pos_label.pack(side='left', padx=5)
-
-        # ETA Label
-        self.eta_label = ttk.Label(self.status_frame, text="Estimated Time Remaining: N/A")
-        self.eta_label.pack(side='right', padx=5)
-
         # Macros tab content
         self.create_macros_tab()
 
         # Settings tab content
         self.create_settings_tab()
 
-        # Set pyautogui pause to 0.025 to eliminate default delay
-        pyautogui.PAUSE = 0.025
+        # Bottom pane: Log Display
+        log_frame = ttk.Frame(main_paned_window)
+        main_paned_window.add(log_frame, weight=1)
 
-        # Configurable delay between tasks
-        self.task_execution_delay = self.config.get('task_execution_delay', 0.1)
-        # Task queue and executor
-        self.task_queue = queue.Queue()
-        self.running_macro_lock = threading.Lock()
-        self.task_executor = TaskExecutor(self.task_queue, self.task_execution_delay, self)
-        self.task_executor.start()
+        self.log_frame = log_frame  # Make log_frame an attribute for reference
+        self.create_log_display()
 
-        # Scheduler
-        self.scheduler = Scheduler(self)
-        self.scheduler.start()
-
-        # Update mouse position and register hotkeys
-        self.update_mouse_position()
-        self.register_hotkeys()
-
-        # Periodically save config if required
-        self.config_save_required = False  # Initialize flag
-        self.after(5000, self.periodic_save_config)
-
-        self.log_details = {}  # Initialize log details storage
+        # Bind the close event
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def on_summary_select(self, event):
         selected_item = self.summary_tree.selection()
@@ -936,129 +893,283 @@ class MacroApp(tk.Tk):
         self.macro_list.tag_configure('disabled', background='lightcoral')
 
     def create_settings_tab(self):
-        settings_canvas = tk.Canvas(self.settings_frame)
-        settings_scrollbar = ttk.Scrollbar(self.settings_frame, orient="vertical", command=settings_canvas.yview)
-        settings_scrollable_frame = ttk.Frame(settings_canvas)
+        """Creates the Settings tab with organized sections."""
+        # Clear existing widgets in settings_frame
+        for widget in self.settings_frame.winfo_children():
+            widget.destroy()
 
-        settings_scrollable_frame.bind(
+        # Use a Canvas and Scrollbar to make the settings scrollable if needed
+        settings_canvas = tk.Canvas(self.settings_frame, borderwidth=0, background="#f0f0f0")
+        scrollbar = ttk.Scrollbar(self.settings_frame, orient="vertical", command=settings_canvas.yview)
+        scrollable_frame = ttk.Frame(settings_canvas)
+
+        scrollable_frame.bind(
             "<Configure>",
             lambda e: settings_canvas.configure(
                 scrollregion=settings_canvas.bbox("all")
             )
         )
 
-        settings_canvas.create_window((0, 0), window=settings_scrollable_frame, anchor="nw")
-        settings_canvas.configure(yscrollcommand=settings_scrollbar.set)
+        settings_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        settings_canvas.configure(yscrollcommand=scrollbar.set)
 
         settings_canvas.pack(side="left", fill="both", expand=True)
-        settings_scrollbar.pack(side="right", fill="y")
+        scrollbar.pack(side="right", fill="y")
 
+        # Define sections using LabelFrame
+        timing_frame = ttk.LabelFrame(scrollable_frame, text="Timing Settings", padding=(20, 10))
+        timing_frame.grid(row=0, column=0, padx=10, pady=10, sticky='ew')
+
+        panel_keys_frame = ttk.LabelFrame(scrollable_frame, text="Panel Keys", padding=(20, 10))
+        panel_keys_frame.grid(row=1, column=0, padx=10, pady=10, sticky='ew')
+
+        wait_times_frame = ttk.LabelFrame(scrollable_frame, text="Wait Times", padding=(20, 10))
+        wait_times_frame.grid(row=2, column=0, padx=10, pady=10, sticky='ew')
+
+        task_delay_frame = ttk.LabelFrame(scrollable_frame, text="Task Execution Delay", padding=(20, 10))
+        task_delay_frame.grid(row=3, column=0, padx=10, pady=10, sticky='ew')
+
+        # Configure grid weights
+        scrollable_frame.columnconfigure(0, weight=1)
+        timing_frame.columnconfigure(1, weight=1)
+        panel_keys_frame.columnconfigure(1, weight=1)
+        wait_times_frame.columnconfigure(0, weight=1)
+        task_delay_frame.columnconfigure(1, weight=1)
+
+        # --- Timing Settings ---
         row = 0
-        # Interface Switch Time
-        ttk.Label(settings_scrollable_frame, text="Interface Switch Time (s):").grid(row=row, column=0, sticky='e',
-                                                                                     padx=5,
-                                                                                     pady=5)
-        self.interface_switch_time_entry = ttk.Entry(settings_scrollable_frame)
+        ttk.Label(timing_frame, text="Interface Switch Time (s):").grid(row=row, column=0, sticky='e', padx=5, pady=5)
+        self.interface_switch_time_entry = ttk.Entry(timing_frame)
         self.interface_switch_time_entry.insert(0, str(self.interface_switch_time))
-        self.interface_switch_time_entry.grid(row=row, column=1, padx=5, pady=5)
+        self.interface_switch_time_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
         row += 1
 
-        # Action Registration Time Min
-        ttk.Label(settings_scrollable_frame, text="Action Registration Time Min (s):").grid(row=row, column=0,
-                                                                                            sticky='e',
-                                                                                            padx=5, pady=5)
-        self.action_time_min_entry = ttk.Entry(settings_scrollable_frame)
-        self.action_time_min_entry.insert(0, str(self.action_registration_time_min))
-        self.action_time_min_entry.grid(row=row, column=1, padx=5, pady=5)
-        row += 1
-
-        # Action Registration Time Max
-        ttk.Label(settings_scrollable_frame, text="Action Registration Time Max (s):").grid(row=row, column=0,
-                                                                                            sticky='e',
-                                                                                            padx=5, pady=5)
-        self.action_time_max_entry = ttk.Entry(settings_scrollable_frame)
-        self.action_time_max_entry.insert(0, str(self.action_registration_time_max))
-        self.action_time_max_entry.grid(row=row, column=1, padx=5, pady=5)
-        row += 1
-
-        # Mouse Move Duration
-        ttk.Label(settings_scrollable_frame, text="Mouse Move Duration (s):").grid(row=row, column=0, sticky='e',
-                                                                                   padx=5,
-                                                                                   pady=5)
-        self.mouse_move_duration_entry = ttk.Entry(settings_scrollable_frame)
-        self.mouse_move_duration_entry.insert(0, str(self.mouse_move_duration))
-        self.mouse_move_duration_entry.grid(row=row, column=1, padx=5, pady=5)
-        row += 1
-
-        # Delay Between Tasks
-        ttk.Label(settings_scrollable_frame, text="Delay Between Tasks (s):").grid(row=row, column=0, sticky='e',
-                                                                                   padx=5,
-                                                                                   pady=5)
-        self.task_execution_delay_entry = ttk.Entry(settings_scrollable_frame)
-        self.task_execution_delay_entry.insert(0, str(self.task_execution_delay))
-        self.task_execution_delay_entry.grid(row=row, column=1, padx=5, pady=5)
-        row += 1
-
-        # Panel Key
-        ttk.Label(settings_scrollable_frame, text="Panel Key:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
-        self.panel_key_entry = ttk.Entry(settings_scrollable_frame)
-        self.panel_key_entry.insert(0, self.panel_key)
-        self.panel_key_entry.grid(row=row, column=1, padx=5, pady=5)
-        row += 1
-
-        # Specific Panel Keys
-        ttk.Label(settings_scrollable_frame, text="Inventory Panel Key:").grid(row=row, column=0, sticky='e', padx=5,
+        ttk.Label(timing_frame, text="Action Registration Time Min (s):").grid(row=row, column=0, sticky='e', padx=5,
                                                                                pady=5)
-        self.inventory_key_entry = ttk.Entry(settings_scrollable_frame)
+        self.action_time_min_entry = ttk.Entry(timing_frame)
+        self.action_time_min_entry.insert(0, str(self.action_registration_time_min))
+        self.action_time_min_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
+        row += 1
+
+        ttk.Label(timing_frame, text="Action Registration Time Max (s):").grid(row=row, column=0, sticky='e', padx=5,
+                                                                               pady=5)
+        self.action_time_max_entry = ttk.Entry(timing_frame)
+        self.action_time_max_entry.insert(0, str(self.action_registration_time_max))
+        self.action_time_max_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
+        row += 1
+
+        ttk.Label(timing_frame, text="Mouse Move Duration (s):").grid(row=row, column=0, sticky='e', padx=5, pady=5)
+        self.mouse_move_duration_entry = ttk.Entry(timing_frame)
+        self.mouse_move_duration_entry.insert(0, str(self.mouse_move_duration))
+        self.mouse_move_duration_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
+        row += 1
+
+        # --- Panel Keys ---
+        row = 0
+        ttk.Label(panel_keys_frame, text="Panel Key:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
+        self.panel_key_entry = ttk.Entry(panel_keys_frame)
+        self.panel_key_entry.insert(0, self.panel_key)
+        self.panel_key_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
+        row += 1
+
+        ttk.Label(panel_keys_frame, text="Inventory Panel Key:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
+        self.inventory_key_entry = ttk.Entry(panel_keys_frame)
         self.inventory_key_entry.insert(0, self.inventory_key)
-        self.inventory_key_entry.grid(row=row, column=1, padx=5, pady=5)
+        self.inventory_key_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
         row += 1
 
-        ttk.Label(settings_scrollable_frame, text="Prayer Panel Key:").grid(row=row, column=0, sticky='e', padx=5,
-                                                                            pady=5)
-        self.prayer_key_entry = ttk.Entry(settings_scrollable_frame)
+        ttk.Label(panel_keys_frame, text="Prayer Panel Key:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
+        self.prayer_key_entry = ttk.Entry(panel_keys_frame)
         self.prayer_key_entry.insert(0, self.prayer_key)
-        self.prayer_key_entry.grid(row=row, column=1, padx=5, pady=5)
+        self.prayer_key_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
         row += 1
 
-        ttk.Label(settings_scrollable_frame, text="Spells Panel Key:").grid(row=row, column=0, sticky='e', padx=5,
-                                                                            pady=5)
-        self.spells_key_entry = ttk.Entry(settings_scrollable_frame)
+        ttk.Label(panel_keys_frame, text="Spells Panel Key:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
+        self.spells_key_entry = ttk.Entry(panel_keys_frame)
         self.spells_key_entry.insert(0, self.spells_key)
-        self.spells_key_entry.grid(row=row, column=1, padx=5, pady=5)
+        self.spells_key_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
         row += 1
 
-        # Wait Times
-        ttk.Label(settings_scrollable_frame, text="Wait Times:").grid(row=row, column=0, sticky='w', padx=5, pady=5)
-        row += 1
-        self.wait_time_entries = {}
-        for wait_name in self.wait_times:
-            ttk.Label(settings_scrollable_frame, text=f"{wait_name}:").grid(row=row, column=0, sticky='e', padx=5,
-                                                                            pady=5)
-            entry = ttk.Entry(settings_scrollable_frame)
-            entry.insert(0, str(self.wait_times[wait_name]))
-            entry.grid(row=row, column=1, padx=5, pady=5)
-            self.wait_time_entries[wait_name] = entry
-            row += 1
+        # --- Wait Times ---
+        # Header
+        ttk.Label(wait_times_frame, text="Name").grid(row=0, column=0, padx=5, pady=5)
+        ttk.Label(wait_times_frame, text="Duration (s)").grid(row=0, column=1, padx=5, pady=5)
 
-        # Add Wait Time Button
-        add_wait_time_btn = ttk.Button(settings_scrollable_frame, text="Add Wait Time", command=self.add_wait_time)
-        add_wait_time_btn.grid(row=row, column=0, columnspan=2, pady=10)
+        self.wait_times_entries = {}
+        for idx, (name, duration) in enumerate(self.wait_times.items(), start=1):
+            ttk.Label(wait_times_frame, text=name).grid(row=idx, column=0, padx=5, pady=5, sticky='e')
+            entry = ttk.Entry(wait_times_frame)
+            entry.insert(0, str(duration))
+            entry.grid(row=idx, column=1, padx=5, pady=5, sticky='w')
+            self.wait_times_entries[name] = entry
+
+        # Add and Delete Wait Time Buttons
+        btn_frame = ttk.Frame(wait_times_frame)
+        btn_frame.grid(row=len(self.wait_times) + 1, column=0, columnspan=2, pady=10)
+
+        add_wait_btn = ttk.Button(btn_frame, text="Add Wait Time", command=self.add_wait_time)
+        add_wait_btn.pack(side='left', padx=5)
+
+        delete_wait_btn = ttk.Button(btn_frame, text="Delete Selected", command=self.delete_wait_time)
+        delete_wait_btn.pack(side='left', padx=5)
+
+        # --- Task Execution Delay ---
+        row = 0
+        ttk.Label(task_delay_frame, text="Delay Between Tasks (s):").grid(row=row, column=0, sticky='e', padx=5, pady=5)
+        self.task_execution_delay_entry = ttk.Entry(task_delay_frame)
+        self.task_execution_delay_entry.insert(0, str(self.task_execution_delay))
+        self.task_execution_delay_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
         row += 1
 
-        # Save Settings Button
-        save_settings_btn = ttk.Button(settings_scrollable_frame, text="Save Settings", command=self.save_settings)
-        save_settings_btn.grid(row=row, column=0, columnspan=2, pady=10)
+        # --- Save Settings Button ---
+        save_settings_btn = ttk.Button(scrollable_frame, text="Save Settings", command=self.save_settings)
+        save_settings_btn.grid(row=4, column=0, pady=20)
 
     def add_wait_time(self):
+        """Adds a new wait time after prompting the user for a name."""
         new_wait_name = simpledialog.askstring("New Wait Time", "Enter the name for the new wait time:")
         if new_wait_name:
-            if new_wait_name in self.wait_times:
-                messagebox.showerror("Duplicate Wait Time", f"A wait time named '{new_wait_name}' already exists.")
+            new_wait_name = new_wait_name.strip()
+            if not new_wait_name:
+                messagebox.showerror("Invalid Name", "Wait time name cannot be empty.")
                 return
+            if new_wait_name in self.wait_times:
+                messagebox.showerror("Duplicate Name", f"A wait time named '{new_wait_name}' already exists.")
+                return
+            # Initialize duration to a default value, e.g., 0.0
             self.wait_times[new_wait_name] = 0.0
-            # Refresh the settings tab to include the new wait time
-            self.create_settings_tab()
+            self.config['wait_times'] = self.wait_times
+            self.save_config()
+            # Refresh the Wait Times section
+            self.refresh_wait_times_section()
+
+    def delete_wait_time(self):
+        """Deletes the selected wait time."""
+        # Create a dialog to select which wait time to delete
+        if not self.wait_times:
+            messagebox.showinfo("No Wait Times", "There are no wait times to delete.")
+            return
+
+        delete_window = tk.Toplevel(self)
+        delete_window.title("Delete Wait Time")
+        delete_window.geometry("300x200")
+
+        ttk.Label(delete_window, text="Select Wait Time to Delete:").pack(padx=10, pady=10)
+
+        wait_time_listbox = tk.Listbox(delete_window, selectmode=tk.SINGLE)
+        for name in self.wait_times:
+            wait_time_listbox.insert(tk.END, name)
+        wait_time_listbox.pack(padx=10, pady=10, fill='both', expand=True)
+
+        def confirm_delete():
+            selected = wait_time_listbox.curselection()
+            if selected:
+                wait_name = wait_time_listbox.get(selected[0])
+                confirm = messagebox.askyesno("Confirm Deletion",
+                                              f"Are you sure you want to delete wait time '{wait_name}'?")
+                if confirm:
+                    del self.wait_times[wait_name]
+                    self.config['wait_times'] = self.wait_times
+                    self.save_config()
+                    self.refresh_wait_times_section()
+                    delete_window.destroy()
+            else:
+                messagebox.showwarning("No Selection", "Please select a wait time to delete.")
+
+        delete_btn = ttk.Button(delete_window, text="Delete", command=confirm_delete)
+        delete_btn.pack(pady=10)
+
+    def refresh_wait_times_section(self):
+        """Refreshes the Wait Times section in the Settings tab."""
+        # Find the Wait Times LabelFrame
+        for child in self.settings_frame.winfo_children():
+            if isinstance(child, tk.Canvas):
+                canvas = child
+                break
+        else:
+            return  # Canvas not found
+
+        scrollable_frame = canvas.winfo_children()[0]
+
+        wait_times_frame = None
+        for child in scrollable_frame.winfo_children():
+            if isinstance(child, ttk.LabelFrame) and child['text'] == "Wait Times":
+                wait_times_frame = child
+                break
+
+        if not wait_times_frame:
+            return  # Wait Times frame not found
+
+        # Clear existing widgets in Wait Times frame except headers and buttons
+        for widget in wait_times_frame.winfo_children():
+            info = widget.grid_info()
+            if info['row'] > 0 and info['row'] < len(self.wait_times) + 1:
+                widget.destroy()
+
+        # Recreate wait times entries
+        self.wait_times_entries.clear()
+        for idx, (name, duration) in enumerate(self.wait_times.items(), start=1):
+            ttk.Label(wait_times_frame, text=name).grid(row=idx, column=0, padx=5, pady=5, sticky='e')
+            entry = ttk.Entry(wait_times_frame)
+            entry.insert(0, str(duration))
+            entry.grid(row=idx, column=1, padx=5, pady=5, sticky='w')
+            self.wait_times_entries[name] = entry
+
+    def save_settings(self):
+        """Saves all settings from the Settings tab."""
+        try:
+            # Timing Settings
+            self.interface_switch_time = float(self.interface_switch_time_entry.get())
+            self.action_registration_time_min = float(self.action_time_min_entry.get())
+            self.action_registration_time_max = float(self.action_time_max_entry.get())
+            self.mouse_move_duration = float(self.mouse_move_duration_entry.get())
+
+            # Panel Keys
+            self.panel_key = self.panel_key_entry.get().strip()
+            self.inventory_key = self.inventory_key_entry.get().strip()
+            self.prayer_key = self.prayer_key_entry.get().strip()
+            self.spells_key = self.spells_key_entry.get().strip()
+
+            # Task Execution Delay
+            self.task_execution_delay = float(self.task_execution_delay_entry.get())
+
+            # Wait Times
+            for name, entry in self.wait_times_entries.items():
+                try:
+                    duration = float(entry.get())
+                    if duration < 0:
+                        raise ValueError
+                    self.wait_times[name] = duration
+                except ValueError:
+                    messagebox.showerror("Invalid Input", f"Duration for '{name}' must be a non-negative number.")
+                    return
+
+            # Update configuration
+            self.config['interface_switch_time'] = self.interface_switch_time
+            self.config['action_registration_time_min'] = self.action_registration_time_min
+            self.config['action_registration_time_max'] = self.action_registration_time_max
+            self.config['mouse_move_duration'] = self.mouse_move_duration
+            self.config['panel_key'] = self.panel_key
+            self.config['specific_panel_keys'] = {
+                'Inventory': self.inventory_key,
+                'Prayer': self.prayer_key,
+                'Spells': self.spells_key
+            }
+            self.config['wait_times'] = self.wait_times
+            self.config['task_execution_delay'] = self.task_execution_delay
+
+            # Save configuration to file
+            self.save_config()
+
+            # Update task executor delay
+            self.task_executor.delay_between_tasks = self.task_execution_delay
+
+            # Re-register hotkeys if panel keys changed
+            self.register_hotkeys()
+
+            messagebox.showinfo("Settings Saved", "All settings have been saved successfully.")
+        except ValueError:
+            messagebox.showerror("Invalid Input", "Please ensure all numerical fields contain valid numbers.")
 
     def update_mouse_position(self):
         x, y = pyautogui.position()
@@ -1092,48 +1203,6 @@ class MacroApp(tk.Tk):
         # Automatically select the latest log
         self.summary_tree.selection_set(log_id)
         self.on_summary_select(None)
-
-    def save_settings(self):
-        try:
-            self.interface_switch_time = float(self.interface_switch_time_entry.get())
-            self.action_registration_time_min = float(self.action_time_min_entry.get())
-            self.action_registration_time_max = float(self.action_time_max_entry.get())
-            self.mouse_move_duration = float(self.mouse_move_duration_entry.get())
-
-            self.task_execution_delay = float(self.task_execution_delay_entry.get())
-            self.task_executor.delay_between_tasks = self.task_execution_delay
-            self.config['task_execution_delay'] = self.task_execution_delay
-
-            self.panel_key = self.panel_key_entry.get()
-            self.inventory_key = self.inventory_key_entry.get()
-            self.prayer_key = self.prayer_key_entry.get()
-            self.spells_key = self.spells_key_entry.get()
-
-            self.config['interface_switch_time'] = self.interface_switch_time
-            self.config['action_registration_time_min'] = self.action_registration_time_min
-            self.config['action_registration_time_max'] = self.action_registration_time_max
-            self.config['mouse_move_duration'] = self.mouse_move_duration
-            self.config['panel_key'] = self.panel_key
-            self.config['specific_panel_keys'] = {
-                'Inventory': self.inventory_key,
-                'Prayer': self.prayer_key,
-                'Spells': self.spells_key
-            }
-
-            # Save wait times
-            for wait_name, entry in self.wait_time_entries.items():
-                try:
-                    self.wait_times[wait_name] = float(entry.get())
-                except ValueError:
-                    messagebox.showerror("Invalid Input", f"Wait time '{wait_name}' must be a number.")
-                    return
-            self.config['wait_times'] = self.wait_times
-
-            self.save_config()
-            self.register_hotkeys()
-            messagebox.showinfo("Settings Saved", "Settings have been saved successfully.")
-        except ValueError:
-            messagebox.showerror("Invalid Input", "Please enter valid numbers for the settings.")
 
     def action_registration_time(self):
         return (self.action_registration_time_min + self.action_registration_time_max) / 2
@@ -1337,23 +1406,76 @@ class MacroApp(tk.Tk):
         milliseconds = int((seconds - int(seconds)) * 1000)
         return f"{int(seconds)}s{milliseconds}ms"
 
-    def log_macro_execution(self, macro_name, log_messages, total_time):
-        timestamp = time.strftime("%H:%M:%S")
-        log_id = f"{timestamp}_{macro_name}_{len(self.log_details)}"  # Unique ID
+    def on_close(self):
+        """Handles the application shutdown process."""
+        # Stop the TaskExecutor
+        self.task_executor.stop()
+        self.task_executor.join()
 
-        # Add to summary log
-        self.summary_tree.insert('', 'end', values=(timestamp, macro_name, self.format_time(total_time)), iid=log_id)
+        # Stop the Scheduler
+        self.scheduler.stop()
+        self.scheduler.join()
 
-        # Store the detailed log
-        detailed_log = ""
-        for msg in log_messages:
-            detailed_log += f"{msg}\n"
+        # Save configuration if required
+        if self.config_save_required:
+            self.save_config()
 
-        self.log_details[log_id] = detailed_log
+        # Destroy the main window
+        self.destroy()
 
-        # Automatically select the latest log
-        self.summary_tree.selection_set(log_id)
-        self.on_summary_select(None)
+    def set_initial_sash_position(self):
+        """Sets the initial sash position proportionally."""
+        log_paned_window = self.summary_log_frame.master
+        total_width = log_paned_window.winfo_width()
+        if total_width > 0:
+            sash_position = total_width // 2
+            log_paned_window.sashpos(0, sash_position)
+
+    def create_log_display(self):
+        """Creates the split log view with summary and detailed logs using PanedWindow."""
+        # PanedWindow for split view horizontally within the log_frame
+        log_paned_window = ttk.PanedWindow(self.log_frame, orient=tk.HORIZONTAL)
+        log_paned_window.pack(fill='both', expand=True)
+
+        # Summary Log Frame (Left Panel)
+        self.summary_log_frame = ttk.Frame(log_paned_window)
+        log_paned_window.add(self.summary_log_frame, weight=1)
+
+        # Detailed Log Frame (Right Panel)
+        self.details_log_frame = ttk.Frame(log_paned_window)
+        log_paned_window.add(self.details_log_frame, weight=1)
+
+        # Treeview for Summary Log
+        columns = ('Timestamp', 'Macro', 'Total Time')
+        self.summary_tree = ttk.Treeview(
+            self.summary_log_frame,
+            columns=columns,
+            show='headings',
+            height=10
+        )
+        for col in columns:
+            self.summary_tree.heading(col, text=col)
+            self.summary_tree.column(col, width=100, anchor='center')
+        self.summary_tree.pack(expand=True, fill='both', padx=5, pady=5)
+
+        # Bind selection event
+        self.summary_tree.bind('<<TreeviewSelect>>', self.on_summary_select)
+
+        # ScrolledText for Detailed Log
+        self.details_text = scrolledtext.ScrolledText(
+            self.details_log_frame,
+            wrap='word',
+            font=('Consolas', 10)
+        )
+        self.details_text.pack(expand=True, fill='both', padx=5, pady=5)
+
+        # Configure tags for coloring in detailed log
+        self.details_text.tag_configure('timestamp', foreground='grey')
+        self.details_text.tag_configure('macro_name', foreground='blue')
+        self.details_text.tag_configure('action', foreground='black')
+        self.details_text.tag_configure('error', foreground='red')
+        self.details_text.tag_configure('success', foreground='green')
+        self.details_text.tag_configure('timing', foreground='purple')
 
 
 class MacroEditor(tk.Toplevel):
@@ -1363,7 +1485,7 @@ class MacroEditor(tk.Toplevel):
         self.macro_config = macro_config
         self.is_copy = is_copy
         self.title("Macro Editor")
-        self.geometry("700x600")
+        self.geometry("1024x600")
         self.resizable(True, True)
         self.create_widgets()
 
@@ -1768,7 +1890,7 @@ class ActionEditor(tk.Toplevel):
         self.action = action
         self.index = index
         self.title("Action Editor")
-        self.geometry("500x600")
+        self.geometry("400x400")
         self.resizable(True, True)
         self.create_widgets()
 

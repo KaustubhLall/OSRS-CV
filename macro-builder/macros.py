@@ -589,8 +589,8 @@ class Scheduler(threading.Thread):
 class MacroApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Python Macro Application")
-        self.geometry("850x700")
+        self.title("OSRS Macros")
+        self.geometry("1024x720")
         self.config_load()
 
         # Timing configurations
@@ -791,6 +791,7 @@ class MacroApp(tk.Tk):
         log_frame = ttk.Frame(self)
         log_frame.pack(side='bottom', fill='both', expand=True)
 
+        self.create_log_display()
         # Split the log frame into summary and detailed logs
         log_paned_window = ttk.PanedWindow(log_frame, orient=tk.HORIZONTAL)
         log_paned_window.pack(fill='both', expand=True)
@@ -802,9 +803,6 @@ class MacroApp(tk.Tk):
         # Detailed Log Frame
         self.details_log_frame = ttk.Frame(log_paned_window)
         log_paned_window.add(self.details_log_frame, weight=1)
-
-        # Set the sash position to make it a 50-50 split after the window is fully loaded
-        self.after(100, lambda: log_paned_window.sashpos(0, self.winfo_width() // 2))
 
         # Treeview for Summary Log
         columns = ('Timestamp', 'Macro', 'Total Time')
@@ -1372,6 +1370,64 @@ class MacroApp(tk.Tk):
 
         # Destroy the main window
         self.destroy()
+
+    def set_initial_sash_position(self):
+        """Sets the initial sash position proportionally."""
+        log_paned_window = self.summary_log_frame.master
+        total_width = log_paned_window.winfo_width()
+        if total_width > 0:
+            sash_position = total_width // 2
+            log_paned_window.sashpos(0, sash_position)
+
+    def create_log_display(self):
+        """Creates the split log view with summary and detailed logs using PanedWindow."""
+        # Log Display Frame
+        log_frame = ttk.Frame(self)
+        log_frame.pack(side='bottom', fill='both', expand=True)
+
+        # PanedWindow for split view
+        log_paned_window = ttk.PanedWindow(log_frame, orient=tk.HORIZONTAL)
+        log_paned_window.pack(fill='both', expand=True)
+
+        # Summary Log Frame (Left Panel)
+        self.summary_log_frame = ttk.Frame(log_paned_window)
+        log_paned_window.add(self.summary_log_frame, weight=1, )
+
+        # Detailed Log Frame (Right Panel)
+        self.details_log_frame = ttk.Frame(log_paned_window)
+        log_paned_window.add(self.details_log_frame, weight=1, )
+
+        # Treeview for Summary Log
+        columns = ('Timestamp', 'Macro', 'Total Time')
+        self.summary_tree = ttk.Treeview(
+            self.summary_log_frame,
+            columns=columns,
+            show='headings',
+            height=10
+        )
+        for col in columns:
+            self.summary_tree.heading(col, text=col)
+            self.summary_tree.column(col, width=100, anchor='center')
+        self.summary_tree.pack(expand=True, fill='both', padx=5, pady=5)
+
+        # Bind selection event
+        self.summary_tree.bind('<<TreeviewSelect>>', self.on_summary_select)
+
+        # ScrolledText for Detailed Log
+        self.details_text = scrolledtext.ScrolledText(
+            self.details_log_frame,
+            wrap='word',
+            font=('Consolas', 10)
+        )
+        self.details_text.pack(expand=True, fill='both', padx=5, pady=5)
+
+        # Configure tags for coloring in detailed log
+        self.details_text.tag_configure('timestamp', foreground='grey')
+        self.details_text.tag_configure('macro_name', foreground='blue')
+        self.details_text.tag_configure('action', foreground='black')
+        self.details_text.tag_configure('error', foreground='red')
+        self.details_text.tag_configure('success', foreground='green')
+        self.details_text.tag_configure('timing', foreground='purple')
 
 
 class MacroEditor(tk.Toplevel):

@@ -51,7 +51,7 @@
             "is_loop_macro": false,
             "schedule": null,
             "repeat_interval": null,
-            "disabled": true,
+            "disabled": false,
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1
@@ -364,12 +364,12 @@
             ],
             "is_dose_macro": false,
             "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": true,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1,
-            "disabled": false,
-            "schedule": null,
-            "repeat_interval": null
+            "loop_count": 1
         },
         {
             "name": "swap2",

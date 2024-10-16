@@ -749,8 +749,16 @@ class MacroApp(tk.Tk):
         # Create the large status indicator at the top
         self.create_status_indicator()
 
+        # Create a vertical PanedWindow to separate the main area and the logs
+        main_paned_window = ttk.PanedWindow(self, orient=tk.VERTICAL)
+        main_paned_window.pack(fill='both', expand=True)
+
+        # Top pane: Toolbar and Notebook (Macros and Settings)
+        top_frame = ttk.Frame(main_paned_window)
+        main_paned_window.add(top_frame, weight=3)
+
         # Toolbar Frame
-        toolbar_frame = ttk.Frame(self)
+        toolbar_frame = ttk.Frame(top_frame)
         toolbar_frame.pack(side='top', fill='x')
 
         # Enable/Disable Macros Button
@@ -776,7 +784,7 @@ class MacroApp(tk.Tk):
         self.mouse_pos_label.pack(side='right', padx=5, pady=5)
 
         # Notebook for tabs
-        self.notebook = ttk.Notebook(self)
+        self.notebook = ttk.Notebook(top_frame)
         self.notebook.pack(expand=True, fill='both')
 
         # Macros tab
@@ -787,87 +795,21 @@ class MacroApp(tk.Tk):
         self.settings_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.settings_frame, text='Settings')
 
-        # Log Display Frame
-        log_frame = ttk.Frame(self)
-        log_frame.pack(side='bottom', fill='both', expand=True)
-
-        self.create_log_display()
-        # Split the log frame into summary and detailed logs
-        log_paned_window = ttk.PanedWindow(log_frame, orient=tk.HORIZONTAL)
-        log_paned_window.pack(fill='both', expand=True)
-
-        # Summary Log Frame
-        self.summary_log_frame = ttk.Frame(log_paned_window)
-        log_paned_window.add(self.summary_log_frame, weight=1)
-
-        # Detailed Log Frame
-        self.details_log_frame = ttk.Frame(log_paned_window)
-        log_paned_window.add(self.details_log_frame, weight=1)
-
-        # Treeview for Summary Log
-        columns = ('Timestamp', 'Macro', 'Total Time')
-        self.summary_tree = ttk.Treeview(self.summary_log_frame, columns=columns, show='headings', height=10)
-        for col in columns:
-            self.summary_tree.heading(col, text=col)
-            self.summary_tree.column(col, width=100, anchor='center')
-        self.summary_tree.pack(expand=True, fill='both', padx=5, pady=5)
-
-        # Bind selection event
-        self.summary_tree.bind('<<TreeviewSelect>>', self.on_summary_select)
-
-        # ScrolledText for Detailed Log
-        self.details_text = scrolledtext.ScrolledText(self.details_log_frame, wrap='word', font=('Consolas', 10))
-        self.details_text.pack(expand=True, fill='both', padx=5, pady=5)
-
-        # Configure tags for coloring in details log
-        self.details_text.tag_configure('timestamp', foreground='grey')
-        self.details_text.tag_configure('macro_name', foreground='blue')
-        self.details_text.tag_configure('action', foreground='black')
-        self.details_text.tag_configure('error', foreground='red')
-        self.details_text.tag_configure('success', foreground='green')
-        self.details_text.tag_configure('timing', foreground='purple')
-
-        self.status_frame = ttk.Frame(self)
-        self.status_frame.pack(side='bottom', fill='x')
-
-        # Mouse position label
-        self.mouse_pos_label = ttk.Label(self.status_frame, text="Mouse Position: (0, 0)")
-        self.mouse_pos_label.pack(side='left', padx=5)
-
-        # ETA Label
-        self.eta_label = ttk.Label(self.status_frame, text="Estimated Time Remaining: N/A")
-        self.eta_label.pack(side='right', padx=5)
-
         # Macros tab content
         self.create_macros_tab()
 
         # Settings tab content
         self.create_settings_tab()
 
-        # Set pyautogui pause to eliminate default delay
-        pyautogui.PAUSE = 0.001
+        # Bottom pane: Log Display
+        log_frame = ttk.Frame(main_paned_window)
+        main_paned_window.add(log_frame, weight=1)
 
-        # Configurable delay between tasks
-        self.task_execution_delay = self.config.get('task_execution_delay', 0.1)
-        # Task queue and executor
-        self.task_queue = queue.Queue()
-        self.running_macro_lock = threading.Lock()
-        self.task_executor = TaskExecutor(self.task_queue, self.task_execution_delay, self)
-        self.task_executor.start()
+        self.log_frame = log_frame  # Make log_frame an attribute for reference
+        self.create_log_display()
 
-        # Scheduler
-        self.scheduler = Scheduler(self)
-        self.scheduler.start()
-
-        # Update mouse position and register hotkeys
-        self.update_mouse_position()
-        self.register_hotkeys()
-
-        # Periodically save config if required
-        self.config_save_required = False  # Initialize flag
-        self.after(5000, self.periodic_save_config)
-
-        self.log_details = {}  # Initialize log details storage
+        # Bind the close event
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def on_summary_select(self, event):
         selected_item = self.summary_tree.selection()
@@ -1361,8 +1303,6 @@ class MacroApp(tk.Tk):
         self.scheduler.stop()
         self.scheduler.join()
 
-        # Stop the HotkeyManager
-        self.hotkey_manager.stop()
 
         # Save configuration if required
         if self.config_save_required:
@@ -1381,21 +1321,17 @@ class MacroApp(tk.Tk):
 
     def create_log_display(self):
         """Creates the split log view with summary and detailed logs using PanedWindow."""
-        # Log Display Frame
-        log_frame = ttk.Frame(self)
-        log_frame.pack(side='bottom', fill='both', expand=True)
-
-        # PanedWindow for split view
-        log_paned_window = ttk.PanedWindow(log_frame, orient=tk.HORIZONTAL)
+        # PanedWindow for split view horizontally within the log_frame
+        log_paned_window = ttk.PanedWindow(self.log_frame, orient=tk.HORIZONTAL)
         log_paned_window.pack(fill='both', expand=True)
 
         # Summary Log Frame (Left Panel)
         self.summary_log_frame = ttk.Frame(log_paned_window)
-        log_paned_window.add(self.summary_log_frame, weight=1, )
+        log_paned_window.add(self.summary_log_frame, weight=1)
 
         # Detailed Log Frame (Right Panel)
         self.details_log_frame = ttk.Frame(log_paned_window)
-        log_paned_window.add(self.details_log_frame, weight=1, )
+        log_paned_window.add(self.details_log_frame, weight=1)
 
         # Treeview for Summary Log
         columns = ('Timestamp', 'Macro', 'Total Time')
@@ -1437,7 +1373,7 @@ class MacroEditor(tk.Toplevel):
         self.macro_config = macro_config
         self.is_copy = is_copy
         self.title("Macro Editor")
-        self.geometry("700x600")
+        self.geometry("1024x600")
         self.resizable(True, True)
         self.create_widgets()
 
@@ -1842,7 +1778,7 @@ class ActionEditor(tk.Toplevel):
         self.action = action
         self.index = index
         self.title("Action Editor")
-        self.geometry("500x600")
+        self.geometry("400x400")
         self.resizable(True, True)
         self.create_widgets()
 

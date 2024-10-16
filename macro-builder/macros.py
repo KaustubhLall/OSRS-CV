@@ -16,7 +16,8 @@ from pynput import keyboard
 class HotkeyManager:
     def __init__(self, app):
         self.app = app
-        self.hotkeys = {}
+        self.builtin_hotkeys = {}
+        self.macro_hotkeys = {}
         self.listener = None
         self.current_keys = set()
         self.pressed_hotkeys = set()
@@ -57,31 +58,31 @@ class HotkeyManager:
         # Stop any existing listener
         if self.listener:
             self.listener.stop()
+            self.listener = None  # Ensure listener is reset
 
         # Clear existing hotkeys
-        self.hotkeys.clear()
+        self.builtin_hotkeys.clear()
+        self.macro_hotkeys.clear()
 
-        # Add hotkey to toggle macros on/off (F1)
-        self.hotkeys[frozenset(['f1'])] = self.app.toggle_macros
+        # Add built-in hotkeys
+        self.builtin_hotkeys[frozenset(['f1'])] = self.app.toggle_macros
+        self.builtin_hotkeys[frozenset(['f2'])] = self.app.scheduler.stop_all_scheduled_macros
 
-        # Add hotkey to stop all scheduled macros (F2)
-        self.hotkeys[frozenset(['f2'])] = self.app.scheduler.stop_all_scheduled_macros
-
-        # Register macros
+        # Register macro-specific hotkeys
         for macro in macros:
             if macro.disabled:
                 continue  # Skip disabled macros
             hotkey = macro.hotkey
             keys = [self.normalize_key_name(k.strip()) for k in hotkey.split('+')]
             key_set = frozenset(keys)
-            self.hotkeys[key_set] = macro
+            self.macro_hotkeys[key_set] = macro
 
         # Start the listener in a separate thread
         self.listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
         self.listener.start()
 
     def on_press(self, key):
-        if not self.app.macros_enabled or self.app.is_recording_hotkeys:
+        if self.app.is_recording_hotkeys:
             return
 
         try:
@@ -96,14 +97,23 @@ class HotkeyManager:
         except AttributeError:
             pass
 
-        for hotkey_keys, action in self.hotkeys.items():
+        # First, check and handle built-in hotkeys
+        for hotkey_keys, action in self.builtin_hotkeys.items():
             if hotkey_keys.issubset(self.current_keys):
                 if hotkey_keys not in self.pressed_hotkeys:
                     self.pressed_hotkeys.add(hotkey_keys)
                     if isinstance(action, Macro):
-                        threading.Thread(target=action.toggle).start()
+                        self.app.task_queue.put(action)
                     elif callable(action):
-                        threading.Thread(target=action).start()
+                        self.app.task_queue.put(action)
+
+        # Then, handle macro-specific hotkeys only if macros are enabled
+        if self.app.macros_enabled:
+            for hotkey_keys, macro in self.macro_hotkeys.items():
+                if hotkey_keys.issubset(self.current_keys):
+                    if hotkey_keys not in self.pressed_hotkeys:
+                        self.pressed_hotkeys.add(hotkey_keys)
+                        self.app.task_queue.put(macro)
 
     def on_release(self, key):
         try:
@@ -126,10 +136,14 @@ class HotkeyManager:
         self.pressed_hotkeys -= to_remove
 
     def disable_hotkeys(self):
-        self.hotkeys_enabled = False
+        if self.listener:
+            self.listener.stop()
+            self.listener = None
 
     def enable_hotkeys(self):
-        self.hotkeys_enabled = True
+        if not self.listener:
+            self.listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
+            self.listener.start()
 
 
 # Macro Class
@@ -430,7 +444,7 @@ def load_macros(app):
             delay = parse_time(macro.schedule)
             if delay is not None:
                 repeat_interval = parse_time(macro.repeat_interval) if macro.repeat_interval else None
-                app.scheduler.schedule_macro(macro, delay, repeat_interval)
+                # app.scheduler.schedule_macro(macro, delay, repeat_interval)  # commendted due to error -> broken
             else:
                 app.log(f"Invalid schedule format for macro '{macro.name}'.")
 
@@ -458,36 +472,49 @@ class TaskExecutor(threading.Thread):
         self.task_queue = task_queue
         self.delay_between_tasks = delay_between_tasks
         self.app = app
-        self.daemon = True
+        self.daemon = True  # Ensure thread exits when main program does
         self.running = True
 
     def run(self):
         while self.running:
-            macro = self.task_queue.get()
-            if macro is None:
+            try:
+                # Use a timeout to periodically check the running flag
+                task = self.task_queue.get(timeout=1)
+            except queue.Empty:
+                continue  # No task received, continue checking
+
+            if task is None:
+                # Sentinel value received, exit the loop
                 break
-            with self.app.running_macro_lock:
-                macro_thread = threading.Thread(target=macro.run_macro)
-                macro_thread.start()
-                macro_thread.join()
+
+            try:
+                with self.app.running_macro_lock:
+                    if hasattr(task, 'run_macro') and callable(getattr(task, 'run_macro')):
+                        task.run_macro()  # Execute Macro instances
+                    elif callable(task):
+                        task()  # Execute standalone functions
+                    else:
+                        self.app.log(f"Unknown task type: {type(task)}", 'error')
+            except Exception as e:
+                self.app.log(f"Exception during task execution: {e}", 'error')
+
             self.task_queue.task_done()
             time.sleep(self.delay_between_tasks)
 
     def stop(self):
         self.running = False
-        # To unblock the queue.get() call
-        self.task_queue.put(None)
+        self.task_queue.put(None)  # Send sentinel to unblock the queue.get()
 
 
 class Scheduler(threading.Thread):
     def __init__(self, app):
         super().__init__()
         self.app = app
-        self.daemon = True
+        self.daemon = True  # Ensure thread exits when main program does
         self.scheduled_tasks = []
         self.lock = threading.Lock()
         self.running = True
-        self.enabled = True  # Add this flag
+        self.enabled = True  # Flag to enable/disable scheduling
 
     def run(self):
         while self.running:
@@ -495,17 +522,31 @@ class Scheduler(threading.Thread):
                 time.sleep(1)
                 continue
             now = time.time()
+            next_run_time = None
+
             with self.lock:
                 for scheduled_task in self.scheduled_tasks[:]:
                     if scheduled_task['next_run'] <= now:
                         macro = scheduled_task['macro']
-                        if not macro.disabled:  # Only run if macro is enabled
+                        if not macro.disabled:
                             self.app.task_queue.put(macro)
                         if scheduled_task['repeat_interval'] is not None:
                             scheduled_task['next_run'] = now + scheduled_task['repeat_interval']
                         else:
                             self.scheduled_tasks.remove(scheduled_task)
-            time.sleep(1)
+                    else:
+                        if next_run_time is None or scheduled_task['next_run'] < next_run_time:
+                            next_run_time = scheduled_task['next_run']
+
+            # Calculate sleep time based on the next task to run
+            if next_run_time:
+                sleep_time = max(0, next_run_time - time.time())
+                # Limit sleep_time to avoid long sleeps in case of clock changes
+                sleep_time = min(sleep_time, 60)
+            else:
+                sleep_time = 1  # Default sleep time if no tasks are scheduled
+
+            time.sleep(sleep_time)
 
     def schedule_macro(self, macro, delay, repeat_interval=None):
         next_run = time.time() + delay
@@ -516,9 +557,7 @@ class Scheduler(threading.Thread):
                 'repeat_interval': repeat_interval
             })
             self.app.update_scheduled_macros()  # Update the scheduled macros display
-
-    def stop(self):
-        self.running = False
+        self.app.log(f"Macro '{macro.name}' has been scheduled to run in {delay} seconds.", 'success')
 
     def stop_all_scheduled_macros(self):
         with self.lock:
@@ -536,8 +575,15 @@ class Scheduler(threading.Thread):
             # If not found, schedule it
             delay = parse_time(macro.schedule)
             repeat_interval = parse_time(macro.repeat_interval) if macro.repeat_interval else None
-            self.schedule_macro(macro, delay, repeat_interval)
-            self.app.log(f"Scheduling for macro '{macro.name}' has been enabled.", 'success')
+            if delay is not None:
+                self.schedule_macro(macro, delay, repeat_interval)
+                self.app.log(f"Scheduling for macro '{macro.name}' has been enabled.", 'success')
+            else:
+                self.app.log(f"Invalid schedule format for macro '{macro.name}'.", 'error')
+
+    def stop(self):
+        """Stops the Scheduler thread gracefully."""
+        self.running = False
 
 
 class MacroApp(tk.Tk):
@@ -608,37 +654,7 @@ class MacroApp(tk.Tk):
         Registers hotkeys without reloading Macro instances to preserve their state.
         This method updates the hotkey mappings based on the current state of macros.
         """
-        # Stop any existing listener to prevent multiple listeners running
-        if self.hotkey_manager.listener:
-            self.hotkey_manager.listener.stop()
-
-        # Clear existing hotkeys
-        self.hotkey_manager.hotkeys.clear()
-
-        # Add hotkey to toggle macros on/off (F1)
-        self.hotkey_manager.hotkeys[frozenset(['f1'])] = self.toggle_macros
-
-        # Add hotkey to stop all scheduled macros (F2)
-        self.hotkey_manager.hotkeys[frozenset(['f2'])] = self.scheduler.stop_all_scheduled_macros
-
-        # Sort macros alphabetically by name
-        sorted_macros = sorted(self.macro_list_data, key=lambda m: m.name.lower())
-
-        # Register each enabled macro's hotkey
-        for macro in sorted_macros:
-            if macro.disabled:
-                continue  # Skip disabled macros
-            hotkey = macro.hotkey
-            keys = [self.hotkey_manager.normalize_key_name(k.strip()) for k in hotkey.split('+')]
-            key_set = frozenset(keys)
-            self.hotkey_manager.hotkeys[key_set] = macro
-
-        # Start the hotkey listener in a separate thread
-        self.hotkey_manager.listener = keyboard.Listener(
-            on_press=self.hotkey_manager.on_press,
-            on_release=self.hotkey_manager.on_release
-        )
-        self.hotkey_manager.listener.start()
+        self.hotkey_manager.register_hotkeys(self.macro_list_data)
 
     def toggle_macro_enabled_state(self, macro):
         """
@@ -830,8 +846,8 @@ class MacroApp(tk.Tk):
         # Settings tab content
         self.create_settings_tab()
 
-        # Set pyautogui pause to 0.025 to eliminate default delay
-        pyautogui.PAUSE = 0.025
+        # Set pyautogui pause to eliminate default delay
+        pyautogui.PAUSE = 0.001
 
         # Configurable delay between tasks
         self.task_execution_delay = self.config.get('task_execution_delay', 0.1)
@@ -1337,23 +1353,25 @@ class MacroApp(tk.Tk):
         milliseconds = int((seconds - int(seconds)) * 1000)
         return f"{int(seconds)}s{milliseconds}ms"
 
-    def log_macro_execution(self, macro_name, log_messages, total_time):
-        timestamp = time.strftime("%H:%M:%S")
-        log_id = f"{timestamp}_{macro_name}_{len(self.log_details)}"  # Unique ID
+    def on_close(self):
+        """Handles the application shutdown process."""
+        # Stop the TaskExecutor
+        self.task_executor.stop()
+        self.task_executor.join()
 
-        # Add to summary log
-        self.summary_tree.insert('', 'end', values=(timestamp, macro_name, self.format_time(total_time)), iid=log_id)
+        # Stop the Scheduler
+        self.scheduler.stop()
+        self.scheduler.join()
 
-        # Store the detailed log
-        detailed_log = ""
-        for msg in log_messages:
-            detailed_log += f"{msg}\n"
+        # Stop the HotkeyManager
+        self.hotkey_manager.stop()
 
-        self.log_details[log_id] = detailed_log
+        # Save configuration if required
+        if self.config_save_required:
+            self.save_config()
 
-        # Automatically select the latest log
-        self.summary_tree.selection_set(log_id)
-        self.on_summary_select(None)
+        # Destroy the main window
+        self.destroy()
 
 
 class MacroEditor(tk.Toplevel):

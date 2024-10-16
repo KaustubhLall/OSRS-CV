@@ -1152,7 +1152,8 @@
     "mouse_move_duration": 0.01,
     "wait_times": {
         "tick_time": 0.6,
-        "4-tick": 2.4
+        "4-tick": 2.4,
+        "3-tick": 0.0
     },
     "task_execution_delay": 0.0
 }

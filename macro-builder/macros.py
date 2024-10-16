@@ -13,12 +13,13 @@ import pyautogui
 from pynput import keyboard
 
 
+from pynput import keyboard
+
 class HotkeyManager:
     def __init__(self, app):
         self.app = app
         self.builtin_hotkeys = {}
         self.macro_hotkeys = {}
-        self.listener = None
         self.current_keys = set()
         self.pressed_hotkeys = set()
         self.key_aliases = {
@@ -41,6 +42,8 @@ class HotkeyManager:
             'f12': 'f12',
             # Add other keys as needed
         }
+        self.listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
+        self.listener.start()
 
     def normalize_key_name(self, key_name):
         key_name = key_name.lower()
@@ -55,11 +58,6 @@ class HotkeyManager:
             return self.key_aliases.get(key_name, key_name)
 
     def register_hotkeys(self, macros):
-        # Stop any existing listener
-        if self.listener:
-            self.listener.stop()
-            self.listener = None  # Ensure listener is reset
-
         # Clear existing hotkeys
         self.builtin_hotkeys.clear()
         self.macro_hotkeys.clear()
@@ -76,10 +74,6 @@ class HotkeyManager:
             keys = [self.normalize_key_name(k.strip()) for k in hotkey.split('+')]
             key_set = frozenset(keys)
             self.macro_hotkeys[key_set] = macro
-
-        # Start the listener in a separate thread
-        self.listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
-        self.listener.start()
 
     def on_press(self, key):
         if self.app.is_recording_hotkeys:
@@ -136,7 +130,7 @@ class HotkeyManager:
         self.pressed_hotkeys -= to_remove
 
     def disable_hotkeys(self):
-        if self.listener:
+        if self.listener and self.listener.running:
             self.listener.stop()
             self.listener = None
 
@@ -144,7 +138,6 @@ class HotkeyManager:
         if not self.listener:
             self.listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
             self.listener.start()
-
 
 # Macro Class
 class Macro:
@@ -266,18 +259,19 @@ class Macro:
         for action in actions:
             if context['should_stop']:
                 break
+            if not self.app.macros_enabled:
+                break
 
             action_type = action.get('type')
-            action_start_time = time.time()
             annotation = action.get('annotation', '')
+            action_start_time = time.time()
 
             if action_type == 'press_panel_key':
                 key = action.get('key', self.app.panel_key)
                 pyautogui.press(key)
-                action_end_time = time.time()
-                action_time = action_end_time - action_start_time
                 log.append(
-                    f"Pressed panel key '{key}' {f'({annotation})' if annotation else ''} [{action_time:.2f}s]")
+                    f"Pressed panel key '{key}' {f'({annotation})' if annotation else ''}")
+                time.sleep(self.app.interface_switch_time)
 
             elif action_type == 'press_specific_panel_key':
                 panel = action.get('panel')
@@ -291,10 +285,9 @@ class Macro:
                     }
                     key = specific_panel_keys.get(panel)
                 pyautogui.press(key)
-                action_end_time = time.time()
-                action_time = action_end_time - action_start_time
                 log.append(
-                    f"Pressed specific panel key '{key}' for panel '{panel}' {f'({annotation})' if annotation else ''} [{action_time:.2f}s]")
+                    f"Pressed specific panel key '{key}' for panel '{panel}' {f'({annotation})' if annotation else ''}")
+                time.sleep(self.app.interface_switch_time)
 
             elif action_type == 'click':
                 positions = action.get('positions', [])
@@ -324,20 +317,18 @@ class Macro:
                     for p in pos:
                         pyautogui.moveTo(p[0], p[1], duration=self.app.mouse_move_duration)
                         pyautogui.click()
-                        # Log time for each click
-                        action_end_time = time.time()
-                        action_time = action_end_time - action_start_time
                         log.append(
-                            f"Clicked at position {p} with modifiers {modifiers} {f'({annotation})' if annotation else ''} [{action_time:.2f}s]")
-                        action_start_time = time.time()
+                            f"Clicked at position {p} with modifiers {modifiers} {f'({annotation})' if annotation else ''}")
+                        # Apply action registration time delay after each click
+                        time.sleep(self.app.action_registration_time())
                 else:
                     # Single position
                     pyautogui.moveTo(pos[0], pos[1], duration=self.app.mouse_move_duration)
                     pyautogui.click()
-                    action_end_time = time.time()
-                    action_time = action_end_time - action_start_time
                     log.append(
-                        f"Clicked at position {pos} with modifiers {modifiers} {f'({annotation})' if annotation else ''} [{action_time:.2f}s]")
+                        f"Clicked at position {pos} with modifiers {modifiers} {f'({annotation})' if annotation else ''}")
+                    # Apply action registration time delay
+                    time.sleep(self.app.action_registration_time())
 
                 # Release modifiers
                 for mod in modifiers:
@@ -353,27 +344,22 @@ class Macro:
 
             elif action_type == 'return_mouse':
                 pyautogui.moveTo(original_position[0], original_position[1], duration=self.app.mouse_move_duration)
-                action_end_time = time.time()
-                action_time = action_end_time - action_start_time
                 log.append(
-                    f"Mouse returned to original position {f'({annotation})' if annotation else ''} [{action_time:.2f}s]")
+                    f"Mouse returned to original position {f'({annotation})' if annotation else ''}")
                 click_after_return = action.get('click_after_return', False)
                 if click_after_return:
                     pyautogui.click()
-                    action_end_time = time.time()
-                    action_time = action_end_time - action_start_time
                     log.append(
-                        f"Clicked after returning to original position {f'({annotation})' if annotation else ''} [{action_time:.2f}s]")
+                        f"Clicked after returning to original position {f'({annotation})' if annotation else ''}")
+                time.sleep(self.app.action_registration_time())
 
             elif action_type == 'wait':
                 duration = action.get('duration', self.app.action_registration_time())
                 if isinstance(duration, str):
                     duration = self.app.wait_times.get(duration, self.app.action_registration_time())
                 time.sleep(duration)
-                action_end_time = time.time()
-                action_time = action_end_time - action_start_time
                 log.append(
-                    f"Waited for {duration} seconds {f'({annotation})' if annotation else ''} [{action_time:.2f}s]")
+                    f"Waited for {duration} seconds {f'({annotation})' if annotation else ''}")
 
             elif action_type == 'run_macro':
                 macro_name = action.get('macro_name')
@@ -382,22 +368,22 @@ class Macro:
                     if sub_macro == self:
                         log.append(f"Cannot run macro '{macro_name}' recursively.")
                     else:
-                        # Initialize local state for sub_macro if not already done
                         if getattr(sub_macro, 'local_state', None) is None:
                             sub_macro.local_state = {'call_count': sub_macro.call_count,
                                                      'current_position_index': sub_macro.current_position_index}
 
                         sub_macro.run_actions(sub_macro.actions, original_position, log, context,
                                               local_state=sub_macro.local_state)
-                        action_end_time = time.time()
-                        action_time = action_end_time - action_start_time
                         log.append(
-                            f"Ran sub-macro '{macro_name}' {f'({annotation})' if annotation else ''} [{action_time:.2f}s]")
+                            f"Ran sub-macro '{macro_name}' {f'({annotation})' if annotation else ''}")
+                        time.sleep(self.app.action_registration_time())
                 else:
                     log.append(f"Macro '{macro_name}' not found.")
+                    time.sleep(self.app.action_registration_time())
 
             else:
                 log.append(f"Unknown action type: {action_type}")
+                time.sleep(self.app.action_registration_time())
 
     def get_total_positions(self):
         # Returns the total number of positions for dose counting
@@ -622,7 +608,7 @@ class MacroApp(tk.Tk):
         self.initialize_macros()
 
         # Set pyautogui pause to 0.025 to eliminate default delay
-        pyautogui.PAUSE = 0.025
+        pyautogui.PAUSE = 0.0025
 
         # Configurable delay between tasks
         self.task_execution_delay = self.config.get('task_execution_delay', 0.1)
@@ -732,6 +718,12 @@ class MacroApp(tk.Tk):
                 "task_execution_delay": 0.1
             }
             self.save_config()
+
+        # Load timings
+        self.interface_switch_time = self.config.get("interface_switch_time", 0.02)
+        self.action_registration_time_min = self.config.get("action_registration_time_min", 0.02)
+        self.action_registration_time_max = self.config.get("action_registration_time_max", 0.02)
+        self.mouse_move_duration = self.config.get("mouse_move_duration", 0)
 
     def save_config(self):
         with open('config.json', 'w') as file:
@@ -1438,20 +1430,15 @@ class MacroApp(tk.Tk):
         self.scheduler.stop()
         self.scheduler.join()
 
+        # Stop HotkeyManager's listener
+        self.hotkey_manager.disable_hotkeys()
+
         # Save configuration if required
         if self.config_save_required:
             self.save_config()
 
         # Destroy the main window
         self.destroy()
-
-    def set_initial_sash_position(self):
-        """Sets the initial sash position proportionally."""
-        log_paned_window = self.summary_log_frame.master
-        total_width = log_paned_window.winfo_width()
-        if total_width > 0:
-            sash_position = total_width // 2
-            log_paned_window.sashpos(0, sash_position)
 
     def create_log_display(self):
         """Creates the split log view with summary and detailed logs using PanedWindow."""

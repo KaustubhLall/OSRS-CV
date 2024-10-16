@@ -1,5 +1,5 @@
 {
-    "interface_switch_time": 0.12,
+    "interface_switch_time": 0.03,
     "action_registration_time_min": 0.02,
     "action_registration_time_max": 0.02,
     "panel_key": "q",
@@ -358,6 +358,10 @@
                     "modifiers": []
                 },
                 {
+                    "type": "wait",
+                    "duration": 0.01
+                },
+                {
                     "type": "return_mouse",
                     "click_after_return": false
                 }
@@ -366,7 +370,7 @@
             "is_loop_macro": false,
             "schedule": null,
             "repeat_interval": null,
-            "disabled": true,
+            "disabled": false,
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1
@@ -441,8 +445,8 @@
                             1104
                         ],
                         [
-                            1888,
-                            1100
+                            1940,
+                            1131
                         ]
                     ],
                     "modifiers": []
@@ -458,13 +462,13 @@
             ],
             "is_dose_macro": true,
             "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": false,
             "dose_count": 1,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1,
-            "disabled": false,
-            "schedule": null,
-            "repeat_interval": null
+            "loop_count": 1
         },
         {
             "name": "melee spec",
@@ -622,7 +626,7 @@
                 },
                 {
                     "type": "wait",
-                    "duration": 0.15
+                    "duration": 0.25
                 },
                 {
                     "type": "click",
@@ -695,6 +699,10 @@
                         [
                             477,
                             60
+                        ],
+                        [
+                            1063,
+                            286
                         ]
                     ],
                     "modifiers": [],
@@ -702,7 +710,7 @@
                 },
                 {
                     "type": "wait",
-                    "duration": 0.2
+                    "duration": 0.3
                 },
                 {
                     "type": "click",
@@ -761,120 +769,124 @@
                     "annotation": "equip"
                 },
                 {
+                    "type": "wait",
+                    "duration": "tick_time"
+                },
+                {
                     "type": "click",
                     "use_saved_target": false,
                     "positions": [
                         [
-                            592,
-                            365
-                        ],
-                        [
-                            579,
-                            428
-                        ],
-                        [
-                            692,
-                            368
-                        ],
-                        [
-                            678,
-                            442
-                        ],
-                        [
-                            778,
-                            369
-                        ],
-                        [
-                            786,
-                            433
-                        ],
-                        [
-                            865,
+                            581,
                             363
                         ],
                         [
-                            869,
-                            442
+                            586,
+                            420
                         ],
                         [
-                            974,
-                            364
+                            679,
+                            365
                         ],
                         [
-                            977,
-                            425
+                            681,
+                            418
                         ],
                         [
-                            1063,
-                            362
+                            792,
+                            368
                         ],
                         [
-                            1056,
-                            448
+                            786,
+                            418
                         ],
                         [
-                            1153,
-                            344
-                        ],
-                        [
-                            1154,
-                            423
-                        ],
-                        [
-                            1259,
-                            356
-                        ],
-                        [
-                            1254,
-                            421
-                        ],
-                        [
-                            597,
-                            512
-                        ],
-                        [
-                            589,
-                            571
-                        ],
-                        [
-                            684,
-                            500
-                        ],
-                        [
-                            689,
-                            587
-                        ],
-                        [
-                            772,
-                            509
-                        ],
-                        [
-                            775,
-                            570
-                        ],
-                        [
-                            878,
-                            493
+                            886,
+                            368
                         ],
                         [
                             873,
-                            575
+                            429
                         ],
                         [
-                            967,
+                            966,
+                            372
+                        ],
+                        [
+                            970,
+                            429
+                        ],
+                        [
+                            1059,
+                            367
+                        ],
+                        [
+                            1061,
+                            433
+                        ],
+                        [
+                            1156,
+                            360
+                        ],
+                        [
+                            1155,
+                            441
+                        ],
+                        [
+                            1257,
+                            372
+                        ],
+                        [
+                            1254,
+                            425
+                        ],
+                        [
+                            589,
+                            494
+                        ],
+                        [
+                            586,
+                            561
+                        ],
+                        [
+                            707,
                             498
                         ],
                         [
-                            969,
-                            571
+                            690,
+                            573
                         ],
                         [
-                            1068,
-                            499
+                            777,
+                            511
                         ],
                         [
-                            1062,
-                            571
+                            766,
+                            590
+                        ],
+                        [
+                            875,
+                            510
+                        ],
+                        [
+                            871,
+                            577
+                        ],
+                        [
+                            989,
+                            513
+                        ],
+                        [
+                            982,
+                            566
+                        ],
+                        [
+                            1069,
+                            498
+                        ],
+                        [
+                            1070,
+                            563
                         ]
                     ],
                     "modifiers": []
@@ -882,12 +894,12 @@
             ],
             "is_dose_macro": false,
             "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": false,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1,
-            "disabled": false,
-            "schedule": null,
-            "repeat_interval": null
+            "loop_count": 1
         },
         {
             "name": "clean herb",

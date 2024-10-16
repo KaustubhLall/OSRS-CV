@@ -893,114 +893,109 @@ class MacroApp(tk.Tk):
         self.macro_list.tag_configure('disabled', background='lightcoral')
 
     def create_settings_tab(self):
-        """Creates the Settings tab with organized sections."""
+        """Creates the Settings tab with an organized, multi-column layout and functional scrollbar."""
         # Clear existing widgets in settings_frame
         for widget in self.settings_frame.winfo_children():
             widget.destroy()
 
-        # Use a Canvas and Scrollbar to make the settings scrollable if needed
+        # Create a Canvas and Scrollbar
         settings_canvas = tk.Canvas(self.settings_frame, borderwidth=0, background="#f0f0f0")
         scrollbar = ttk.Scrollbar(self.settings_frame, orient="vertical", command=settings_canvas.yview)
-        scrollable_frame = ttk.Frame(settings_canvas)
-
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: settings_canvas.configure(
-                scrollregion=settings_canvas.bbox("all")
-            )
-        )
-
-        settings_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         settings_canvas.configure(yscrollcommand=scrollbar.set)
 
-        settings_canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+        settings_canvas.pack(side="left", fill="both", expand=True)
 
-        # Define sections using LabelFrame
-        timing_frame = ttk.LabelFrame(scrollable_frame, text="Timing Settings", padding=(20, 10))
-        timing_frame.grid(row=0, column=0, padx=10, pady=10, sticky='ew')
+        # Create a Frame inside the Canvas
+        scrollable_frame = ttk.Frame(settings_canvas, padding=(10, 10))
+        settings_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
 
-        panel_keys_frame = ttk.LabelFrame(scrollable_frame, text="Panel Keys", padding=(20, 10))
-        panel_keys_frame.grid(row=1, column=0, padx=10, pady=10, sticky='ew')
+        # Bind the configure event to update the scrollregion
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: settings_canvas.configure(scrollregion=settings_canvas.bbox("all"))
+        )
 
-        wait_times_frame = ttk.LabelFrame(scrollable_frame, text="Wait Times", padding=(20, 10))
-        wait_times_frame.grid(row=2, column=0, padx=10, pady=10, sticky='ew')
-
-        task_delay_frame = ttk.LabelFrame(scrollable_frame, text="Task Execution Delay", padding=(20, 10))
-        task_delay_frame.grid(row=3, column=0, padx=10, pady=10, sticky='ew')
-
-        # Configure grid weights
-        scrollable_frame.columnconfigure(0, weight=1)
-        timing_frame.columnconfigure(1, weight=1)
-        panel_keys_frame.columnconfigure(1, weight=1)
-        wait_times_frame.columnconfigure(0, weight=1)
-        task_delay_frame.columnconfigure(1, weight=1)
+        # --- Multi-Column Layout ---
+        # We'll use a grid with three columns for better horizontal space utilization
+        for i in range(3):
+            scrollable_frame.columnconfigure(i, weight=1, pad=10)
 
         # --- Timing Settings ---
-        row = 0
-        ttk.Label(timing_frame, text="Interface Switch Time (s):").grid(row=row, column=0, sticky='e', padx=5, pady=5)
-        self.interface_switch_time_entry = ttk.Entry(timing_frame)
+        timing_frame = ttk.LabelFrame(scrollable_frame, text="Timing Settings", padding=(10, 10))
+        timing_frame.grid(row=0, column=0, padx=5, pady=5, sticky='nsew')
+
+        # Interface Switch Time
+        ttk.Label(timing_frame, text="Interface Switch Time (s):").grid(row=0, column=0, sticky='e', padx=5, pady=5)
+        self.interface_switch_time_entry = ttk.Entry(timing_frame, width=12)
         self.interface_switch_time_entry.insert(0, str(self.interface_switch_time))
-        self.interface_switch_time_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
-        row += 1
+        self.interface_switch_time_entry.grid(row=0, column=1, padx=5, pady=5, sticky='w')
 
-        ttk.Label(timing_frame, text="Action Registration Time Min (s):").grid(row=row, column=0, sticky='e', padx=5,
+        # Action Registration Time Min
+        ttk.Label(timing_frame, text="Action Registration Time Min (s):").grid(row=1, column=0, sticky='e', padx=5,
                                                                                pady=5)
-        self.action_time_min_entry = ttk.Entry(timing_frame)
+        self.action_time_min_entry = ttk.Entry(timing_frame, width=12)
         self.action_time_min_entry.insert(0, str(self.action_registration_time_min))
-        self.action_time_min_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
-        row += 1
+        self.action_time_min_entry.grid(row=1, column=1, padx=5, pady=5, sticky='w')
 
-        ttk.Label(timing_frame, text="Action Registration Time Max (s):").grid(row=row, column=0, sticky='e', padx=5,
+        # Action Registration Time Max
+        ttk.Label(timing_frame, text="Action Registration Time Max (s):").grid(row=2, column=0, sticky='e', padx=5,
                                                                                pady=5)
-        self.action_time_max_entry = ttk.Entry(timing_frame)
+        self.action_time_max_entry = ttk.Entry(timing_frame, width=12)
         self.action_time_max_entry.insert(0, str(self.action_registration_time_max))
-        self.action_time_max_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
-        row += 1
+        self.action_time_max_entry.grid(row=2, column=1, padx=5, pady=5, sticky='w')
 
-        ttk.Label(timing_frame, text="Mouse Move Duration (s):").grid(row=row, column=0, sticky='e', padx=5, pady=5)
-        self.mouse_move_duration_entry = ttk.Entry(timing_frame)
+        # Mouse Move Duration
+        ttk.Label(timing_frame, text="Mouse Move Duration (s):").grid(row=3, column=0, sticky='e', padx=5, pady=5)
+        self.mouse_move_duration_entry = ttk.Entry(timing_frame, width=12)
         self.mouse_move_duration_entry.insert(0, str(self.mouse_move_duration))
-        self.mouse_move_duration_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
-        row += 1
+        self.mouse_move_duration_entry.grid(row=3, column=1, padx=5, pady=5, sticky='w')
 
         # --- Panel Keys ---
-        row = 0
-        ttk.Label(panel_keys_frame, text="Panel Key:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
-        self.panel_key_entry = ttk.Entry(panel_keys_frame)
+        panel_keys_frame = ttk.LabelFrame(scrollable_frame, text="Panel Keys", padding=(10, 10))
+        panel_keys_frame.grid(row=0, column=1, padx=5, pady=5, sticky='nsew')
+
+        # Panel Key
+        ttk.Label(panel_keys_frame, text="Panel Key:").grid(row=0, column=0, sticky='e', padx=5, pady=5)
+        self.panel_key_entry = ttk.Entry(panel_keys_frame, width=12)
         self.panel_key_entry.insert(0, self.panel_key)
-        self.panel_key_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
-        row += 1
+        self.panel_key_entry.grid(row=0, column=1, padx=5, pady=5, sticky='w')
 
-        ttk.Label(panel_keys_frame, text="Inventory Panel Key:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
-        self.inventory_key_entry = ttk.Entry(panel_keys_frame)
+        # Inventory Panel Key
+        ttk.Label(panel_keys_frame, text="Inventory Panel Key:").grid(row=1, column=0, sticky='e', padx=5, pady=5)
+        self.inventory_key_entry = ttk.Entry(panel_keys_frame, width=12)
         self.inventory_key_entry.insert(0, self.inventory_key)
-        self.inventory_key_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
-        row += 1
+        self.inventory_key_entry.grid(row=1, column=1, padx=5, pady=5, sticky='w')
 
-        ttk.Label(panel_keys_frame, text="Prayer Panel Key:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
-        self.prayer_key_entry = ttk.Entry(panel_keys_frame)
+        # Prayer Panel Key
+        ttk.Label(panel_keys_frame, text="Prayer Panel Key:").grid(row=2, column=0, sticky='e', padx=5, pady=5)
+        self.prayer_key_entry = ttk.Entry(panel_keys_frame, width=12)
         self.prayer_key_entry.insert(0, self.prayer_key)
-        self.prayer_key_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
-        row += 1
+        self.prayer_key_entry.grid(row=2, column=1, padx=5, pady=5, sticky='w')
 
-        ttk.Label(panel_keys_frame, text="Spells Panel Key:").grid(row=row, column=0, sticky='e', padx=5, pady=5)
-        self.spells_key_entry = ttk.Entry(panel_keys_frame)
+        # Spells Panel Key
+        ttk.Label(panel_keys_frame, text="Spells Panel Key:").grid(row=3, column=0, sticky='e', padx=5, pady=5)
+        self.spells_key_entry = ttk.Entry(panel_keys_frame, width=12)
         self.spells_key_entry.insert(0, self.spells_key)
-        self.spells_key_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
-        row += 1
+        self.spells_key_entry.grid(row=3, column=1, padx=5, pady=5, sticky='w')
 
         # --- Wait Times ---
+        wait_times_frame = ttk.LabelFrame(scrollable_frame, text="Wait Times", padding=(10, 10))
+        wait_times_frame.grid(row=0, column=2, padx=5, pady=5, sticky='nsew')
+
+        wait_times_frame.columnconfigure(0, weight=1)
+        wait_times_frame.columnconfigure(1, weight=1)
+
         # Header
-        ttk.Label(wait_times_frame, text="Name").grid(row=0, column=0, padx=5, pady=5)
-        ttk.Label(wait_times_frame, text="Duration (s)").grid(row=0, column=1, padx=5, pady=5)
+        ttk.Label(wait_times_frame, text="Name").grid(row=0, column=0, padx=5, pady=5, sticky='w')
+        ttk.Label(wait_times_frame, text="Duration (s)").grid(row=0, column=1, padx=5, pady=5, sticky='w')
 
         self.wait_times_entries = {}
         for idx, (name, duration) in enumerate(self.wait_times.items(), start=1):
-            ttk.Label(wait_times_frame, text=name).grid(row=idx, column=0, padx=5, pady=5, sticky='e')
-            entry = ttk.Entry(wait_times_frame)
+            ttk.Label(wait_times_frame, text=name).grid(row=idx, column=0, padx=5, pady=2, sticky='e')
+            entry = ttk.Entry(wait_times_frame, width=12)
             entry.insert(0, str(duration))
-            entry.grid(row=idx, column=1, padx=5, pady=5, sticky='w')
+            entry.grid(row=idx, column=1, padx=5, pady=2, sticky='w')
             self.wait_times_entries[name] = entry
 
         # Add and Delete Wait Time Buttons
@@ -1014,16 +1009,43 @@ class MacroApp(tk.Tk):
         delete_wait_btn.pack(side='left', padx=5)
 
         # --- Task Execution Delay ---
-        row = 0
-        ttk.Label(task_delay_frame, text="Delay Between Tasks (s):").grid(row=row, column=0, sticky='e', padx=5, pady=5)
-        self.task_execution_delay_entry = ttk.Entry(task_delay_frame)
+        task_delay_frame = ttk.LabelFrame(scrollable_frame, text="Task Execution Delay", padding=(10, 10))
+        task_delay_frame.grid(row=1, column=0, columnspan=3, padx=5, pady=5, sticky='ew')
+
+        task_delay_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(task_delay_frame, text="Delay Between Tasks (s):").grid(row=0, column=0, sticky='e', padx=5, pady=5)
+        self.task_execution_delay_entry = ttk.Entry(task_delay_frame, width=12)
         self.task_execution_delay_entry.insert(0, str(self.task_execution_delay))
-        self.task_execution_delay_entry.grid(row=row, column=1, padx=5, pady=5, sticky='w')
-        row += 1
+        self.task_execution_delay_entry.grid(row=0, column=1, padx=5, pady=5, sticky='w')
 
         # --- Save Settings Button ---
         save_settings_btn = ttk.Button(scrollable_frame, text="Save Settings", command=self.save_settings)
-        save_settings_btn.grid(row=4, column=0, pady=20)
+        save_settings_btn.grid(row=2, column=0, columnspan=3, pady=20)
+
+        # --- Mouse Wheel Scrolling ---
+        # Define a function to handle mouse wheel scrolling
+        def _on_mousewheel(event):
+            if event.num == 5 or event.delta == -120:
+                settings_canvas.yview_scroll(1, "unit")
+            elif event.num == 4 or event.delta == 120:
+                settings_canvas.yview_scroll(-1, "unit")
+
+        # Bind the mouse wheel to the Canvas
+        settings_canvas.bind_all("<MouseWheel>", _on_mousewheel)  # Windows and MacOS
+        settings_canvas.bind_all("<Button-4>", _on_mousewheel)  # Linux scroll up
+        settings_canvas.bind_all("<Button-5>", _on_mousewheel)  # Linux scroll down
+
+        # --- Final Adjustments ---
+        # Ensure that the scrollable_frame expands correctly
+        for i in range(3):
+            scrollable_frame.columnconfigure(i, weight=1)
+
+        # Prevent the scrollbar from overlapping the content
+        settings_canvas.configure(scrollregion=settings_canvas.bbox("all"))
+
+        # Remove any residual padding that might cause grey areas
+        self.settings_frame.configure(padding=0)
 
     def add_wait_time(self):
         """Adds a new wait time after prompting the user for a name."""

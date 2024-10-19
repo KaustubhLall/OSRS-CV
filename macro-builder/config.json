@@ -1,7 +1,7 @@
 {
-    "interface_switch_time": 0.03,
-    "action_registration_time_min": 0.02,
-    "action_registration_time_max": 0.02,
+    "interface_switch_time": 0.01,
+    "action_registration_time_min": 0.01,
+    "action_registration_time_max": 0.01,
     "panel_key": "q",
     "specific_panel_keys": {
         "Inventory": "w",
@@ -11,7 +11,7 @@
     "macros": [
         {
             "name": "prayer - wilderness flick",
-            "hotkey": "ctrl + 1",
+            "hotkey": "ctrl+1",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
@@ -65,16 +65,16 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            2042,
-                            1280
+                            2041,
+                            1271
                         ],
                         [
-                            2126,
-                            1272
+                            2135,
+                            1274
                         ],
                         [
-                            2215,
-                            1273
+                            2211,
+                            1268
                         ]
                     ],
                     "modifiers": [],
@@ -272,7 +272,7 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1,
-            "disabled": false,
+            "disabled": true,
             "schedule": null,
             "repeat_interval": null
         },
@@ -285,20 +285,28 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1959,
-                            1053
+                            1965,
+                            1122
                         ],
                         [
-                            1958,
-                            1127
+                            1965,
+                            1186
                         ],
                         [
-                            2042,
+                            2038,
                             1126
                         ],
                         [
-                            2042,
-                            1060
+                            2036,
+                            1206
+                        ],
+                        [
+                            2123,
+                            1123
+                        ],
+                        [
+                            2123,
+                            1196
                         ]
                     ],
                     "modifiers": []
@@ -353,6 +361,10 @@
                         [
                             1956,
                             972
+                        ],
+                        [
+                            2035,
+                            981
                         ]
                     ],
                     "modifiers": []
@@ -408,8 +420,12 @@
                             902
                         ],
                         [
-                            2051,
-                            969
+                            2125,
+                            985
+                        ],
+                        [
+                            2212,
+                            980
                         ]
                     ],
                     "modifiers": []
@@ -421,12 +437,12 @@
             ],
             "is_dose_macro": false,
             "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": false,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1,
-            "disabled": false,
-            "schedule": null,
-            "repeat_interval": null
+            "loop_count": 1
         },
         {
             "name": "prayer - augury/rigor",
@@ -525,7 +541,7 @@
         },
         {
             "name": "SPELL BIND",
-            "hotkey": "b",
+            "hotkey": "c",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
@@ -540,8 +556,8 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            2217,
-                            1059
+                            1938,
+                            1174
                         ]
                     ],
                     "modifiers": []
@@ -557,12 +573,12 @@
             ],
             "is_dose_macro": false,
             "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": true,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": 1,
-            "disabled": false,
-            "schedule": null,
-            "repeat_interval": null
+            "loop_count": 1
         },
         {
             "name": "SPELL TB",
@@ -581,15 +597,15 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            2012,
-                            1139
+                            2033,
+                            1171
                         ]
                     ],
                     "modifiers": []
                 },
                 {
                     "type": "return_mouse",
-                    "click_after_return": false
+                    "click_after_return": true
                 },
                 {
                     "type": "press_specific_panel_key",
@@ -597,12 +613,13 @@
                 }
             ],
             "is_dose_macro": false,
-            "call_count": 0,
-            "current_position_index": 0,
-            "disabled": false,
             "is_loop_macro": false,
             "schedule": null,
-            "repeat_interval": null
+            "repeat_interval": null,
+            "disabled": true,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
         },
         {
             "name": "loadout_gen",
@@ -711,66 +728,6 @@
                 {
                     "type": "wait",
                     "duration": 0.3
-                },
-                {
-                    "type": "click",
-                    "use_saved_target": false,
-                    "positions": [
-                        [
-                            1945,
-                            830
-                        ],
-                        [
-                            1953,
-                            901
-                        ],
-                        [
-                            1959,
-                            966
-                        ],
-                        [
-                            2063,
-                            994
-                        ],
-                        [
-                            2045,
-                            906
-                        ],
-                        [
-                            2046,
-                            839
-                        ],
-                        [
-                            2134,
-                            842
-                        ],
-                        [
-                            2117,
-                            905
-                        ],
-                        [
-                            2124,
-                            974
-                        ],
-                        [
-                            2206,
-                            907
-                        ],
-                        [
-                            2194,
-                            832
-                        ],
-                        [
-                            477,
-                            56
-                        ]
-                    ],
-                    "modifiers": [],
-                    "annotation": "equip"
-                },
-                {
-                    "type": "wait",
-                    "duration": "tick_time"
                 },
                 {
                     "type": "click",
@@ -890,13 +847,153 @@
                         ]
                     ],
                     "modifiers": []
+                },
+                {
+                    "type": "wait",
+                    "duration": 0.1
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            767,
+                            353
+                        ],
+                        [
+                            782,
+                            439
+                        ],
+                        [
+                            871,
+                            363
+                        ],
+                        [
+                            872,
+                            426
+                        ],
+                        [
+                            981,
+                            356
+                        ],
+                        [
+                            974,
+                            431
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "wait",
+                    "duration": 0.1
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1060,
+                            358
+                        ],
+                        [
+                            1069,
+                            429
+                        ],
+                        [
+                            1157,
+                            360
+                        ],
+                        [
+                            1163,
+                            433
+                        ],
+                        [
+                            1266,
+                            360
+                        ],
+                        [
+                            1259,
+                            439
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "wait",
+                    "duration": 0.1
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            601,
+                            494
+                        ],
+                        [
+                            576,
+                            582
+                        ],
+                        [
+                            702,
+                            497
+                        ],
+                        [
+                            689,
+                            576
+                        ],
+                        [
+                            784,
+                            485
+                        ],
+                        [
+                            766,
+                            561
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "wait",
+                    "duration": 0.1
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            886,
+                            496
+                        ],
+                        [
+                            868,
+                            570
+                        ],
+                        [
+                            969,
+                            501
+                        ],
+                        [
+                            964,
+                            586
+                        ],
+                        [
+                            1066,
+                            512
+                        ],
+                        [
+                            1057,
+                            576
+                        ]
+                    ],
+                    "modifiers": []
                 }
             ],
             "is_dose_macro": false,
             "is_loop_macro": false,
             "schedule": null,
             "repeat_interval": null,
-            "disabled": false,
+            "disabled": true,
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1
@@ -1025,7 +1122,7 @@
             "is_loop_macro": false,
             "schedule": null,
             "repeat_interval": null,
-            "disabled": true,
+            "disabled": false,
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1
@@ -1100,13 +1197,13 @@
                 }
             ],
             "is_dose_macro": false,
-            "is_loop_macro": true,
+            "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": true,
             "call_count": 0,
             "current_position_index": 0,
-            "loop_count": -1,
-            "disabled": true,
-            "schedule": null,
-            "repeat_interval": null
+            "loop_count": 1
         },
         {
             "name": "test",
@@ -1156,6 +1253,516 @@
             "schedule": "0",
             "repeat_interval": "2",
             "disabled": false,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
+        },
+        {
+            "name": "get loadout",
+            "hotkey": "l",
+            "actions": [
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1298,
+                            1018
+                        ],
+                        [
+                            1370,
+                            1011
+                        ],
+                        [
+                            882,
+                            1025
+                        ],
+                        [
+                            686,
+                            1027
+                        ],
+                        [
+                            481,
+                            1033
+                        ]
+                    ],
+                    "modifiers": [],
+                    "annotation": "deposit items"
+                },
+                {
+                    "type": "wait",
+                    "duration": 0.3
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            588,
+                            217
+                        ],
+                        [
+                            595,
+                            272
+                        ],
+                        [
+                            676,
+                            217
+                        ],
+                        [
+                            675,
+                            277
+                        ],
+                        [
+                            774,
+                            214
+                        ],
+                        [
+                            783,
+                            284
+                        ],
+                        [
+                            867,
+                            210
+                        ],
+                        [
+                            858,
+                            286
+                        ],
+                        [
+                            964,
+                            213
+                        ],
+                        [
+                            974,
+                            284
+                        ],
+                        [
+                            1069,
+                            289
+                        ],
+                        [
+                            976,
+                            1026
+                        ],
+                        [
+                            1049,
+                            210
+                        ],
+                        [
+                            1049,
+                            210
+                        ],
+                        [
+                            1050,
+                            210
+                        ],
+                        [
+                            1050,
+                            210
+                        ],
+                        [
+                            879,
+                            1022
+                        ],
+                        [
+                            481,
+                            61
+                        ]
+                    ],
+                    "modifiers": [],
+                    "annotation": "get equippables and go to equip"
+                },
+                {
+                    "type": "wait",
+                    "duration": 0.3
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1958,
+                            828
+                        ],
+                        [
+                            1957,
+                            907
+                        ],
+                        [
+                            2051,
+                            843
+                        ],
+                        [
+                            2043,
+                            915
+                        ],
+                        [
+                            2124,
+                            838
+                        ],
+                        [
+                            2118,
+                            921
+                        ],
+                        [
+                            2210,
+                            840
+                        ],
+                        [
+                            2203,
+                            914
+                        ],
+                        [
+                            2124,
+                            981
+                        ],
+                        [
+                            2043,
+                            984
+                        ],
+                        [
+                            1963,
+                            980
+                        ],
+                        [
+                            476,
+                            59
+                        ]
+                    ],
+                    "modifiers": [],
+                    "annotation": "equip items and bank"
+                },
+                {
+                    "type": "wait",
+                    "duration": 0.3
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            591,
+                            361
+                        ],
+                        [
+                            584,
+                            443
+                        ],
+                        [
+                            680,
+                            359
+                        ],
+                        [
+                            685,
+                            442
+                        ],
+                        [
+                            767,
+                            360
+                        ],
+                        [
+                            780,
+                            441
+                        ],
+                        [
+                            876,
+                            352
+                        ],
+                        [
+                            866,
+                            430
+                        ],
+                        [
+                            971,
+                            365
+                        ],
+                        [
+                            958,
+                            435
+                        ],
+                        [
+                            1067,
+                            360
+                        ],
+                        [
+                            1070,
+                            432
+                        ],
+                        [
+                            1175,
+                            358
+                        ],
+                        [
+                            1165,
+                            420
+                        ],
+                        [
+                            1254,
+                            360
+                        ],
+                        [
+                            1249,
+                            432
+                        ],
+                        [
+                            591,
+                            501
+                        ],
+                        [
+                            593,
+                            571
+                        ],
+                        [
+                            706,
+                            491
+                        ],
+                        [
+                            687,
+                            575
+                        ],
+                        [
+                            778,
+                            496
+                        ],
+                        [
+                            778,
+                            584
+                        ],
+                        [
+                            873,
+                            503
+                        ],
+                        [
+                            865,
+                            583
+                        ],
+                        [
+                            969,
+                            502
+                        ],
+                        [
+                            959,
+                            580
+                        ],
+                        [
+                            1063,
+                            498
+                        ],
+                        [
+                            1057,
+                            577
+                        ]
+                    ],
+                    "modifiers": []
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": false,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
+        },
+        {
+            "name": "spell - veng",
+            "hotkey": "v",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2165,
+                            1051
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": true,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
+        },
+        {
+            "name": "spell - veng other",
+            "hotkey": "b",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2084,
+                            1055
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": true
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": true,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
+        },
+        {
+            "name": "spell - fire surge Copy",
+            "hotkey": "c",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1940,
+                            1099
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": true
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": true,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
+        },
+        {
+            "name": "pvp swap 1",
+            "hotkey": "f",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1966,
+                            907
+                        ],
+                        [
+                            1966,
+                            974
+                        ],
+                        [
+                            2035,
+                            910
+                        ],
+                        [
+                            2040,
+                            967
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "run_macro",
+                    "macro_name": "prayer - augury/rigor"
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": true,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
+        },
+        {
+            "name": "pvp pk skull prevention",
+            "hotkey": "`",
+            "actions": [
+                {
+                    "type": "press_panel_key",
+                    "key": "f10"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1943,
+                            933
+                        ],
+                        [
+                            1671,
+                            1357
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": true,
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1

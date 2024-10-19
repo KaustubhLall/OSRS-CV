@@ -1,0 +1,405 @@
+{
+    "interface_switch_time": 0.2,
+    "action_registration_time_min": 0.02,
+    "action_registration_time_max": 0.02,
+    "mouse_move_duration": 0.0,
+    "panel_key": "q",
+    "specific_panel_keys": {
+        "Inventory": "w",
+        "Prayer": "e",
+        "Spells": "r"
+    },
+    "wait_times": {
+        "tick_time": 0.6
+    },
+    "macros": [
+        {
+            "name": "overload",
+            "hotkey": "z",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2061,
+                            979
+                        ],
+                        [
+                            2117,
+                            984
+                        ],
+                        [
+                            2184,
+                            985
+                        ],
+                        [
+                            2231,
+                            985
+                        ],
+                        [
+                            2063,
+                            1022
+                        ],
+                        [
+                            2117,
+                            1030
+                        ],
+                        [
+                            2174,
+                            1033
+                        ],
+                        [
+                            2222,
+                            1028
+                        ],
+                        [
+                            2063,
+                            1072
+                        ],
+                        [
+                            2124,
+                            1072
+                        ],
+                        [
+                            2173,
+                            1069
+                        ],
+                        [
+                            2230,
+                            1078
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": true,
+            "is_loop_macro": false,
+            "is_scheduled": true,
+            "dose_count": 4,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1,
+            "schedule_interval": 301.0
+        },
+        {
+            "name": "absorption",
+            "hotkey": "x",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Spells"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2070,
+                            1122
+                        ],
+                        [
+                            2121,
+                            1122
+                        ],
+                        [
+                            2175,
+                            1126
+                        ],
+                        [
+                            2229,
+                            1128
+                        ],
+                        [
+                            2063,
+                            1163
+                        ],
+                        [
+                            2115,
+                            1163
+                        ],
+                        [
+                            2176,
+                            1175
+                        ],
+                        [
+                            2229,
+                            1168
+                        ],
+                        [
+                            2069,
+                            1209
+                        ],
+                        [
+                            2118,
+                            1205
+                        ],
+                        [
+                            2177,
+                            1218
+                        ],
+                        [
+                            2232,
+                            1208
+                        ],
+                        [
+                            2062,
+                            1250
+                        ],
+                        [
+                            2116,
+                            1258
+                        ]
+                    ],
+                    "modifiers": []
+                }
+            ],
+            "is_dose_macro": true,
+            "is_loop_macro": false,
+            "is_scheduled": true,
+            "dose_count": 4,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1,
+            "schedule_interval": 77.0
+        },
+        {
+            "name": "flick",
+            "hotkey": "c",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2107,
+                            978
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "wait",
+                    "duration": 0.25
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2095,
+                            979
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "is_scheduled": true,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1,
+            "schedule_interval": 27.0
+        },
+        {
+            "name": "prayer pot",
+            "hotkey": "d",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2071,
+                            980
+                        ],
+                        [
+                            2116,
+                            979
+                        ],
+                        [
+                            2174,
+                            982
+                        ],
+                        [
+                            2230,
+                            984
+                        ],
+                        [
+                            2066,
+                            1024
+                        ],
+                        [
+                            2116,
+                            1029
+                        ],
+                        [
+                            2176,
+                            1032
+                        ],
+                        [
+                            2228,
+                            1026
+                        ],
+                        [
+                            2065,
+                            1070
+                        ],
+                        [
+                            2116,
+                            1076
+                        ],
+                        [
+                            2176,
+                            1067
+                        ],
+                        [
+                            2227,
+                            1074
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": true,
+            "is_loop_macro": false,
+            "is_scheduled": true,
+            "dose_count": 4,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1,
+            "schedule_interval": 47.0
+        },
+        {
+            "name": "spec",
+            "hotkey": "s",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2178,
+                            1252
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "wait",
+                    "duration": "tick_time"
+                },
+                {
+                    "type": "wait",
+                    "duration": "tick_time"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2098,
+                            223
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "wait",
+                    "duration": 2.5
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2108,
+                            225
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "wait",
+                    "duration": 2.5
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2181,
+                            1264
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "is_scheduled": true,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1,
+            "schedule_interval": 180.0
+        }
+    ],
+    "task_queue_delay": 0.0
+}

@@ -14,6 +14,8 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, JSON
 from sqlalchemy.orm import declarative_base, sessionmaker
 import requests
 from threading import Lock
+import re
+
 
 # -------------------- Config Class -------------------- #
 
@@ -68,6 +70,7 @@ class Config:
                 default[k] = v
         return default
 
+
 # -------------------- Logger Setup -------------------- #
 
 class Logger:
@@ -98,9 +101,11 @@ class Logger:
     def get_logger(self):
         return self.logger
 
+
 # -------------------- Database Setup -------------------- #
 
 Base = declarative_base()
+
 
 class Event(Base):
     __tablename__ = 'events'
@@ -113,6 +118,7 @@ class Event(Base):
 
     def __repr__(self):
         return f"<Event {self.event_type} at {self.received_at}>"
+
 
 class Database:
     def __init__(self, config, logger):
@@ -149,6 +155,7 @@ class Database:
         events = session.query(Event).order_by(Event.received_at.desc()).limit(limit).all()
         session.close()
         return events
+
 
 # -------------------- Data Fetcher -------------------- #
 
@@ -266,23 +273,25 @@ class ItemCache:
     def get_npc_name(self, npc_id):
         return self.npc_mapping.get(npc_id, f"NPC {npc_id}")
 
+
 def format_number(value):
     if value is None:
         return "N/A"
     try:
         num = float(value)
         if num >= 1_000_000_000_000:
-            return f"{num/1_000_000_000_000:.2f}T"
+            return f"{num / 1_000_000_000_000:.2f}T"
         elif num >= 1_000_000_000:
-            return f"{num/1_000_000_000:.2f}B"
+            return f"{num / 1_000_000_000:.2f}B"
         elif num >= 1_000_000:
-            return f"{num/1_000_000:.2f}M"
+            return f"{num / 1_000_000:.2f}M"
         elif num >= 1_000:
-            return f"{num/1_000:.2f}k"
+            return f"{num / 1_000:.2f}k"
         else:
             return str(int(num))
     except (ValueError, TypeError):
         return str(value)
+
 
 # -------------------- Request Counter -------------------- #
 
@@ -305,9 +314,11 @@ class RequestCounter:
         with self.lock:
             return self.count
 
+
 # -------------------- Server Setup -------------------- #
 
 from flask import Flask, request, jsonify
+
 
 def create_app(config, logger, database, item_cache, event_queue, request_counter):
     app = Flask(__name__)
@@ -329,6 +340,7 @@ def create_app(config, logger, database, item_cache, event_queue, request_counte
                     logger.warning("Invalid Bearer token")
                     return jsonify({'error': 'Unauthorized'}), 401
             return f(*args, **kwargs)
+
         return decorated
 
     # Helper function to validate JSON payload
@@ -345,7 +357,9 @@ def create_app(config, logger, database, item_cache, event_queue, request_counte
                     logger.error(f"Missing fields in JSON: {missing}")
                     return jsonify({'error': f'Missing fields: {missing}'}), 400
                 return f(data, *args, **kwargs)
+
             return decorated_function
+
         return decorator
 
     # Supported Endpoints with their corresponding event types
@@ -429,8 +443,8 @@ def create_app(config, logger, database, item_cache, event_queue, request_counte
                     if item_id:
                         item_info = item_cache.get_item_info(item_id)
                         item['itemName'] = item_info.get('itemName')
-                        item['itemPrice'] = item_info.get('itemPrice')
-                        item['itemPriceFormatted'] = item_info.get('itemPriceFormatted')
+                        item['gePrice'] = item_info.get('itemPrice')  # Assuming gePrice is the itemPrice
+                        item['gePriceFormatted'] = item_info.get('itemPriceFormatted')
             elif event_type == 'EquipSlotsNotification':
                 # Map equipped items
                 equipped_items = data['data'].get('equippedItems', {})
@@ -449,14 +463,20 @@ def create_app(config, logger, database, item_cache, event_queue, request_counte
                     if item_id:
                         item_info = item_cache.get_item_info(item_id)
                         item['itemName'] = item_info.get('itemName')
-                        item['itemPrice'] = item_info.get('itemPrice')
-                        item['itemPriceFormatted'] = item_info.get('itemPriceFormatted')
+                        item['value'] = item_info.get('itemPrice')  # Assuming 'value' is the itemPrice
+                        item['valueFormatted'] = item_info.get('itemPriceFormatted')
             elif event_type == 'QuestChangeNotification':
                 # Map quest IDs to names if necessary
                 quests = data['data'].get('quests', [])
                 for quest in quests:
                     # Assuming quest 'name' is already provided
                     pass
+            elif event_type == 'LevelChangeNotification':
+                # Handle level change specific mapping if needed
+                pass
+            elif event_type == 'LoginNotification':
+                # Handle login state specific mapping if needed
+                pass
             # Add more event types as needed
         except Exception as e:
             logger.error(f"Error mapping IDs to names for event {event_type}: {e}")
@@ -475,7 +495,7 @@ def create_app(config, logger, database, item_cache, event_queue, request_counte
             @app.route(full_endpoint_inner, methods=['POST'], endpoint=endpoint_name)
             @require_bearer_token
             @validate_json(['data', 'timestamp'])
-            def handler(data):
+            def handler(data, event_type_inner=event_type_inner):
                 request_counter.increment()
                 try:
                     process_event(event_type_inner, data)
@@ -493,8 +513,10 @@ def create_app(config, logger, database, item_cache, event_queue, request_counte
 
     return app
 
+
 def run_server(app, host, port):
     app.run(host=host, port=port, use_reloader=False, threaded=True)
+
 
 class ServerThread(threading.Thread):
     def __init__(self, app, host, port):
@@ -510,13 +532,14 @@ class ServerThread(threading.Thread):
         except Exception as e:
             print(f"Server error: {e}")
 
+
 # -------------------- Main Application -------------------- #
 
 class App:
     def __init__(self, root, request_counter):
         self.root = root
         self.root.title("OSRS Events Dashboard")
-        self.root.geometry("1000x700")
+        self.root.geometry("1200x800")  # Increased size for better layout
 
         self.request_counter = request_counter
 
@@ -538,7 +561,7 @@ class App:
 
     def setup_ui(self):
         # Active requests label
-        self.active_requests_label = ttk.Label(self.root, text="Active Requests: 0")
+        self.active_requests_label = ttk.Label(self.root, text="Active Requests: 0", font=('Arial', 12, 'bold'))
         self.active_requests_label.pack(pady=5)
 
         # PanedWindow for tabs
@@ -566,6 +589,13 @@ class App:
         self.config_text.pack(fill='both', expand=True)
         self.load_config()
 
+        # Add tags for syntax highlighting
+        self.config_text.tag_configure('key', foreground='blue', font=('TkDefaultFont', 10, 'bold'))
+        self.config_text.tag_configure('string', foreground='green')
+        self.config_text.tag_configure('number', foreground='darkorange')
+        self.config_text.tag_configure('boolean', foreground='purple')
+        self.config_text.tag_configure('null', foreground='red')
+
         # Save button
         self.save_button = ttk.Button(self.config_frame, text='Save Config', command=self.save_config)
         self.save_button.pack(pady=5)
@@ -573,7 +603,12 @@ class App:
     def load_config(self):
         config_str = yaml.dump(self.config.config)
         self.config_text.delete('1.0', tk.END)
-        self.config_text.insert(tk.END, config_str)
+        try:
+            data = yaml.safe_load(config_str)
+            self.insert_yaml_with_tags(data)
+        except Exception as e:
+            self.logger.error(f"Error loading config with tags: {e}")
+            self.config_text.insert(tk.END, config_str)
 
     def save_config(self):
         config_str = self.config_text.get('1.0', tk.END)
@@ -588,19 +623,51 @@ class App:
             self.logger.error(f"Error saving config: {e}")
             messagebox.showerror("Error", f"Error saving config: {e}")
 
+    def insert_yaml_with_tags(self, data, indent=0):
+        if isinstance(data, dict):
+            self.config_text.insert(tk.END, "{\n")
+            for i, (key, value) in enumerate(data.items()):
+                self.config_text.insert(tk.END, '  ' * (indent + 1))
+                self.config_text.insert(tk.END, f'"{key}"', 'key')
+                self.config_text.insert(tk.END, ': ')
+                self.insert_yaml_with_tags(value, indent + 1)
+                if i < len(data) - 1:
+                    self.config_text.insert(tk.END, ',')
+                self.config_text.insert(tk.END, '\n')
+            self.config_text.insert(tk.END, '  ' * indent + "}")
+        elif isinstance(data, list):
+            self.config_text.insert(tk.END, "[\n")
+            for i, item in enumerate(data):
+                self.config_text.insert(tk.END, '  ' * (indent + 1))
+                self.insert_yaml_with_tags(item, indent + 1)
+                if i < len(data) - 1:
+                    self.config_text.insert(tk.END, ',')
+                self.config_text.insert(tk.END, '\n')
+            self.config_text.insert(tk.END, '  ' * indent + "]")
+        elif isinstance(data, str):
+            self.config_text.insert(tk.END, f'"{data}"', 'string')
+        elif isinstance(data, bool):
+            self.config_text.insert(tk.END, 'true' if data else 'false', 'boolean')
+        elif data is None:
+            self.config_text.insert(tk.END, 'null', 'null')
+        else:
+            self.config_text.insert(tk.END, str(data), 'number')
+
     def setup_events_tab(self):
         # Create a PanedWindow for resizable panes
         self.paned_window = ttk.PanedWindow(self.events_frame, orient=tk.VERTICAL)
         self.paned_window.pack(fill='both', expand=True)
 
         # Treeview to display events
-        self.events_tree = ttk.Treeview(self.paned_window, columns=('Event Type', 'Timestamp', 'Received At'), show='headings')
+        self.events_tree = ttk.Treeview(self.paned_window, columns=('Event Type', 'Timestamp', 'Received At'),
+                                        show='headings', selectmode='browse')
         self.events_tree.heading('Event Type', text='Event Type')
         self.events_tree.heading('Timestamp', text='Timestamp')
         self.events_tree.heading('Received At', text='Received At')
         self.events_tree.column('Event Type', width=200, stretch=True)
         self.events_tree.column('Timestamp', width=200, stretch=True)
         self.events_tree.column('Received At', width=200, stretch=True)
+        self.events_tree.pack(fill='both', expand=True)
         self.paned_window.add(self.events_tree)
 
         # Lower pane with event data tree and text view
@@ -622,7 +689,7 @@ class App:
         self.collapse_button.pack(side=tk.LEFT, padx=5, pady=5)
 
         # event_data_tree
-        self.event_data_tree = ttk.Treeview(self.tree_frame)
+        self.event_data_tree = ttk.Treeview(self.tree_frame, show='tree')
         self.event_data_tree.pack(fill='both', expand=True)
 
         # Right frame for text view
@@ -637,11 +704,35 @@ class App:
         self.event_data_text = scrolledtext.ScrolledText(self.text_frame, wrap='word')
         self.event_data_text.pack(fill='both', expand=True, padx=5, pady=5)
 
+        # Add tags for syntax highlighting
+        self.event_data_text.tag_configure('key', foreground='blue', font=('TkDefaultFont', 10, 'bold'))
+        self.event_data_text.tag_configure('string', foreground='green')
+        self.event_data_text.tag_configure('number', foreground='darkorange')
+        self.event_data_text.tag_configure('boolean', foreground='purple')
+        self.event_data_text.tag_configure('null', foreground='red')
+
         # Bind selection event
         self.events_tree.bind('<<TreeviewSelect>>', self.on_event_select)
 
+        # Apply Treeview styles for formatting
+        self.setup_treeview_styles()
+
         # Load initial events
         self.load_events()
+
+    def setup_treeview_styles(self):
+        style = ttk.Style()
+        style.configure("Treeview", foreground="black", font=('Arial', 10))
+        style.map("Treeview", background=[('selected', '#ececec')])
+
+        # Define tags for Treeview items
+        self.events_tree.tag_configure('NpcKillNotification', foreground='blue')
+        self.events_tree.tag_configure('LevelChangeNotification', foreground='green')
+        self.events_tree.tag_configure('BankNotification', foreground='orange')
+        self.events_tree.tag_configure('EquipSlotsNotification', foreground='purple')
+        self.events_tree.tag_configure('InventorySlotsNotification', foreground='brown')
+        self.events_tree.tag_configure('LoginNotification', foreground='cyan')
+        self.events_tree.tag_configure('QuestChangeNotification', foreground='magenta')
 
     def expand_all(self):
         self.expand_tree(self.event_data_tree)
@@ -665,7 +756,7 @@ class App:
         json_text = self.event_data_text.get('1.0', tk.END)
         self.root.clipboard_clear()
         self.root.clipboard_append(json_text)
-        messagebox.showinfo("Copy JSON", "JSON data copied to clipboard.")
+        # Removed the popup message after copying
 
     def load_events(self):
         events = self.database.get_events()
@@ -677,7 +768,9 @@ class App:
             except ValueError:
                 timestamp_str = event.timestamp
             received_at_str = event.received_at.strftime('%Y-%m-%d %H:%M:%S')
-            self.events_tree.insert('', 'end', iid=event.id, values=(event.event_type, timestamp_str, received_at_str))
+            # Insert event with tag for coloring
+            self.events_tree.insert('', 'end', iid=event.id, values=(event.event_type, timestamp_str, received_at_str),
+                                    tags=(event.event_type,))
 
     def on_event_select(self, event):
         selected_item = self.events_tree.selection()
@@ -692,10 +785,9 @@ class App:
                 # Display the JSON data in the tree
                 data = event_record.data
                 self.display_json_in_tree(self.event_data_tree, '', data)
-                # Display the JSON data in the text widget
-                data_str = json.dumps(data, indent=2)
+                # Display the JSON data in the text widget with syntax highlighting
                 self.event_data_text.delete('1.0', tk.END)
-                self.event_data_text.insert(tk.END, data_str)
+                self.insert_json_with_tags(data)
 
     def clear_tree(self, tree):
         tree.delete(*tree.get_children())
@@ -704,27 +796,76 @@ class App:
         if isinstance(json_data, dict):
             for key, value in json_data.items():
                 if isinstance(value, (dict, list)):
-                    node_id = tree.insert(parent, 'end', text=str(key), open=False)
+                    node_id = tree.insert(parent, 'end', text=str(key), open=False, tags=('key',))
                     self.display_json_in_tree(tree, node_id, value)
                 else:
-                    node_text = f"{key}: {value}"
-                    tree.insert(parent, 'end', text=node_text)
+                    formatted_value = self.format_specific_fields(key, value, json_data)
+                    node_text = f"{key}: {formatted_value}"
+                    tree.insert(parent, 'end', text=node_text, tags=('value',))
         elif isinstance(json_data, list):
             for index, item in enumerate(json_data):
                 if isinstance(item, (dict, list)):
-                    node_id = tree.insert(parent, 'end', text=f"[{index}]", open=False)
+                    node_id = tree.insert(parent, 'end', text=f"[{index}]", open=False, tags=('key',))
                     self.display_json_in_tree(tree, node_id, item)
                 else:
                     node_text = f"[{index}]: {item}"
-                    tree.insert(parent, 'end', text=node_text)
+                    tree.insert(parent, 'end', text=node_text, tags=('value',))
         else:
-            tree.insert(parent, 'end', text=str(json_data))
+            tree.insert(parent, 'end', text=str(json_data), tags=('value',))
+
+    def format_specific_fields(self, key, value, parent_data):
+        # Apply specific formatting to certain fields
+        if key == 'gePrice':
+            return f"{format_number(value)} (GE)"
+        elif key == 'value':
+            return f"{format_number(value)} (Bank)"
+        elif key == 'playerInfo' and isinstance(value, dict):
+            return f"Player: {value.get('username', 'N/A')}"
+        else:
+            return value
+
+    def insert_json_with_tags(self, data, indent=0):
+        if isinstance(data, dict):
+            self.event_data_text.insert(tk.END, '{\n')
+            for i, (key, value) in enumerate(data.items()):
+                self.event_data_text.insert(tk.END, '  ' * (indent + 1))
+                self.event_data_text.insert(tk.END, f'"{key}"', 'key')
+                self.event_data_text.insert(tk.END, ': ')
+                self.insert_json_with_tags(value, indent + 1)
+                if i < len(data) - 1:
+                    self.event_data_text.insert(tk.END, ',')
+                self.event_data_text.insert(tk.END, '\n')
+            self.event_data_text.insert(tk.END, '  ' * indent + '}')
+        elif isinstance(data, list):
+            self.event_data_text.insert(tk.END, '[\n')
+            for i, item in enumerate(data):
+                self.event_data_text.insert(tk.END, '  ' * (indent + 1))
+                self.insert_json_with_tags(item, indent + 1)
+                if i < len(data) - 1:
+                    self.event_data_text.insert(tk.END, ',')
+                self.event_data_text.insert(tk.END, '\n')
+            self.event_data_text.insert(tk.END, '  ' * indent + ']')
+        elif isinstance(data, str):
+            self.event_data_text.insert(tk.END, f'"{data}"', 'string')
+        elif isinstance(data, bool):
+            self.event_data_text.insert(tk.END, 'true' if data else 'false', 'boolean')
+        elif data is None:
+            self.event_data_text.insert(tk.END, 'null', 'null')
+        else:
+            self.event_data_text.insert(tk.END, str(data), 'number')
 
     def setup_logs_tab(self):
         self.log_text = scrolledtext.ScrolledText(self.logs_frame, wrap='word', state='disabled')
         self.log_text.pack(fill='both', expand=True)
         self.log_queue = queue.Queue()
         self.setup_logger()
+
+        # Configure tags for log levels
+        self.log_text.tag_configure('DEBUG', foreground='gray')
+        self.log_text.tag_configure('INFO', foreground='green')
+        self.log_text.tag_configure('WARNING', foreground='orange')
+        self.log_text.tag_configure('ERROR', foreground='red')
+        self.log_text.tag_configure('CRITICAL', foreground='red', font=('TkDefaultFont', 10, 'bold'))
 
     def setup_logger(self):
         # Set up a logging handler that writes to the log_text widget
@@ -735,7 +876,7 @@ class App:
 
             def emit(self, record):
                 log_entry = self.format(record)
-                self.log_queue.put(log_entry)
+                self.log_queue.put((record.levelname, log_entry))
 
         handler = QueueHandler(self.log_queue)
         formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
@@ -759,16 +900,20 @@ class App:
                     timestamp_str = timestamp
                 # Insert the event into the Treeview if not already present
                 if not self.events_tree.exists(event_id):
-                    self.events_tree.insert('', 0, iid=event_id, values=(event_type, timestamp_str, received_at))
+                    self.events_tree.insert('', 0, iid=event_id, values=(event_type, timestamp_str, received_at),
+                                            tags=(event_type,))
         except queue.Empty:
             pass
 
         # Update logs
         try:
             while True:
-                log_message = self.log_queue.get_nowait()
+                level, log_message = self.log_queue.get_nowait()
                 self.log_text.configure(state='normal')
+                start_index = self.log_text.index(tk.END)
                 self.log_text.insert(tk.END, log_message + '\n')
+                end_index = self.log_text.index(tk.END)
+                self.log_text.tag_add(level, start_index, end_index)
                 self.log_text.see(tk.END)
                 self.log_text.configure(state='disabled')
         except queue.Empty:
@@ -783,13 +928,15 @@ class App:
 
     def start_server(self):
         # Create the Flask app
-        app = create_app(self.config.config, self.logger, self.database, self.item_cache, self.event_queue, self.request_counter)
+        app = create_app(self.config.config, self.logger, self.database, self.item_cache, self.event_queue,
+                         self.request_counter)
         # Start the server in a separate thread
         host = self.config.config['server']['host']
         port = self.config.config['server']['port']
         self.server_thread = ServerThread(app, host, port)
         self.server_thread.start()
         self.logger.info(f"Server started on {host}:{port}")
+
 
 # -------------------- Run the Application -------------------- #
 
@@ -798,5 +945,3 @@ if __name__ == '__main__':
     request_counter = RequestCounter()
     app = App(root, request_counter)
     root.mainloop()
-
-

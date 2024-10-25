@@ -1,0 +1,20 @@
+server:
+  host: "0.0.0.0"
+  port: 5000
+
+security:
+  bearer_token: ""
+
+logging:
+  level: "DEBUG"
+  file: "osrs_events.log"
+
+database:
+  uri: "sqlite:///events.db"
+
+api:
+  prefix: "/api"
+
+mappings:
+  item_file: "items.json"
+  npc_file: "npcs.json"

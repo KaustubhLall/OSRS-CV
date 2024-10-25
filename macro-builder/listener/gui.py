@@ -48,9 +48,9 @@ class Config:
     def load_config(self):
         if os.path.exists(self.config_path):
             with open(self.config_path, 'r') as f:
-                config = yaml.safe_load(f)
+                loaded_config = yaml.safe_load(f)
             # Update default config with loaded config
-            self.update_dict(self.default_config, config)
+            self.update_dict(self.default_config, loaded_config)
             config = self.default_config
         else:
             config = self.default_config.copy()
@@ -62,8 +62,8 @@ class Config:
 
     def update_dict(self, default, update):
         for k, v in update.items():
-            if isinstance(v, dict):
-                default[k] = self.update_dict(default.get(k, {}), v)
+            if isinstance(v, dict) and k in default:
+                self.update_dict(default[k], v)
             else:
                 default[k] = v
         return default
@@ -104,15 +104,11 @@ Base = declarative_base()
 
 class Event(Base):
     __tablename__ = 'events'
-
     id = Column(Integer, primary_key=True)
     event_type = Column(String(50), nullable=False)
     data = Column(JSON, nullable=False)
     timestamp = Column(String(50), nullable=False)
     received_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
-
-    def __repr__(self):
-        return f"<Event {self.event_type} at {self.received_at}>"
 
 class Database:
     def __init__(self, config, logger):
@@ -127,28 +123,40 @@ class Database:
         with self.lock:
             session = self.Session()
             try:
-                event = Event(
-                    event_type=event_type,
-                    data=data,
-                    timestamp=timestamp
-                )
+                event = Event(event_type=event_type, data=data, timestamp=timestamp)
                 session.add(event)
                 session.commit()
                 event_id = event.id
-                session.close()
-                self.logger.info(f"Event {event_type} saved to database with ID {event_id}.")
+                self.logger.info(f"Event '{event_type}' saved to database with ID {event_id}.")
                 return event_id
             except Exception as e:
                 session.rollback()
                 self.logger.error(f"Error saving event to database: {e}")
-                session.close()
                 return None
+            finally:
+                session.close()
 
     def get_events(self, limit=100):
         session = self.Session()
-        events = session.query(Event).order_by(Event.received_at.desc()).limit(limit).all()
-        session.close()
-        return events
+        try:
+            events = session.query(Event).order_by(Event.received_at.desc()).limit(limit).all()
+            return events
+        except Exception as e:
+            self.logger.error(f"Error fetching events from database: {e}")
+            return []
+        finally:
+            session.close()
+
+    def get_event_by_id(self, event_id):
+        session = self.Session()
+        try:
+            event = session.get(Event, event_id)
+            return event
+        except Exception as e:
+            self.logger.error(f"Error fetching event ID {event_id}: {e}")
+            return None
+        finally:
+            session.close()
 
 # -------------------- Data Fetcher -------------------- #
 
@@ -174,34 +182,45 @@ class ItemCache:
         # Load item mappings
         item_file = self.get_config_path('item_file')
         if os.path.exists(item_file):
-            with open(item_file, 'r') as f:
-                item_data = json.load(f)
+            try:
+                with open(item_file, 'r') as f:
+                    item_data = json.load(f)
                 for item in item_data:
                     item_id = int(item['id'])
                     item_name = item['name']
                     self.item_mapping[item_id] = item_name
-            self.logger.info(f"Loaded item mapping from {item_file}")
+                self.logger.info(f"Loaded item mapping from {item_file}")
+            except Exception as e:
+                self.logger.error(f"Error loading item mapping from {item_file}: {e}")
+                self.fetch_item_mapping()
         else:
             self.fetch_item_mapping()
 
         # Load NPC mappings
         npc_file = self.get_config_path('npc_file')
         if os.path.exists(npc_file):
-            with open(npc_file, 'r') as f:
-                npc_data = json.load(f)
+            try:
+                with open(npc_file, 'r') as f:
+                    npc_data = json.load(f)
                 for npc in npc_data:
                     npc_id = int(npc['id'])
                     npc_name = npc['name']
                     self.npc_mapping[npc_id] = npc_name
-            self.logger.info(f"Loaded NPC mapping from {npc_file}")
+                self.logger.info(f"Loaded NPC mapping from {npc_file}")
+            except Exception as e:
+                self.logger.error(f"Error loading NPC mapping from {npc_file}: {e}")
+                self.load_default_npc_mapping()
         else:
-            # Default minimal NPC mapping
-            self.npc_mapping = {
-                44: 'Goblin',
-                299: 'Black Knight',
-                # Add more NPCs as needed
-            }
-            self.logger.info("Default NPC mapping loaded.")
+            self.load_default_npc_mapping()
+
+    def load_default_npc_mapping(self):
+        # Default minimal NPC mapping
+        self.npc_mapping = {
+            44: 'Goblin',
+            299: 'Black Knight',
+            # Add more NPCs as needed
+        }
+        self.logger.info("Default NPC mapping loaded.")
 
     def get_config_path(self, filename_key):
         return self.config['mappings'].get(filename_key, filename_key)
@@ -210,17 +229,15 @@ class ItemCache:
         url = 'https://prices.runescape.wiki/api/v1/osrs/mapping'
         try:
             response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                with open('items.json', 'w') as f:
-                    json.dump(data, f)
-                for item in data:
-                    item_id = int(item['id'])
-                    item_name = item['name']
-                    self.item_mapping[item_id] = item_name
-                self.logger.info("Fetched and saved item mapping from OSRS API")
-            else:
-                self.logger.error(f"Failed to fetch item mapping from OSRS API, status code: {response.status_code}")
+            response.raise_for_status()
+            data = response.json()
+            with open(self.get_config_path('item_file'), 'w') as f:
+                json.dump(data, f)
+            for item in data:
+                item_id = int(item['id'])
+                item_name = item['name']
+                self.item_mapping[item_id] = item_name
+            self.logger.info("Fetched and saved item mapping from OSRS API")
         except Exception as e:
             self.logger.error(f"Error fetching item mapping from OSRS API: {e}")
 
@@ -228,14 +245,12 @@ class ItemCache:
         url = 'https://prices.runescape.wiki/api/v1/osrs/latest'
         try:
             response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                with self.lock:
-                    self.price_data = data.get('data', {})
-                    self.last_price_fetch_time = time.time()
-                self.logger.info("Fetched latest price data")
-            else:
-                self.logger.error(f"Failed to fetch prices, status code: {response.status_code}")
+            response.raise_for_status()
+            data = response.json()
+            with self.lock:
+                self.price_data = data.get('data', {})
+                self.last_price_fetch_time = time.time()
+            self.logger.info("Fetched latest price data")
         except Exception as e:
             self.logger.error(f"Error fetching latest price data: {e}")
 
@@ -249,7 +264,8 @@ class ItemCache:
         with self.lock:
             current_time = time.time()
             if current_time - self.last_price_fetch_time > self.cache_duration:
-                pass  # Price data will be fetched by the background thread
+                # Trigger immediate price fetch if cache expired
+                self.fetch_price_data()
             item_name = self.item_mapping.get(item_id, f"Item {item_id}")
             price_entry = self.price_data.get(str(item_id), {})
             high_price = price_entry.get('high')
@@ -305,7 +321,7 @@ class RequestCounter:
         with self.lock:
             return self.count
 
-# -------------------- Server Setup -------------------- #
+# -------------------- Flask Server Setup -------------------- #
 
 from flask import Flask, request, jsonify
 
@@ -314,7 +330,6 @@ def create_app(config, logger, database, item_cache, event_queue, request_counte
     api_prefix = config['api']['prefix']
     bearer_token = config['security']['bearer_token']
 
-    # Security: Bearer Token Decorator
     def require_bearer_token(f):
         @wraps(f)
         def decorated(*args, **kwargs):
@@ -324,14 +339,17 @@ def create_app(config, logger, database, item_cache, event_queue, request_counte
                 if not auth_header.startswith('Bearer '):
                     logger.warning("Missing or malformed Authorization header")
                     return jsonify({'error': 'Unauthorized'}), 401
-                received_token = auth_header.split(' ')[1]
+                parts = auth_header.split()
+                if len(parts) != 2 or parts[0] != 'Bearer':
+                    logger.warning("Invalid Bearer token format")
+                    return jsonify({'error': 'Unauthorized'}), 401
+                received_token = parts[1]
                 if received_token != token:
                     logger.warning("Invalid Bearer token")
                     return jsonify({'error': 'Unauthorized'}), 401
             return f(*args, **kwargs)
         return decorated
 
-    # Helper function to validate JSON payload
     def validate_json(required_fields):
         def decorator(f):
             @wraps(f)
@@ -348,7 +366,6 @@ def create_app(config, logger, database, item_cache, event_queue, request_counte
             return decorated_function
         return decorator
 
-    # Supported Endpoints with their corresponding event types
     supported_endpoints = {
         'npc_kill': '/npc_kill/',
         'level_change': '/level_change/',
@@ -359,7 +376,6 @@ def create_app(config, logger, database, item_cache, event_queue, request_counte
         'quest_change': '/quest_change/'
     }
 
-    # Event type mapping
     event_type_mapping = {
         'npc_kill': 'NpcKillNotification',
         'level_change': 'LevelChangeNotification',
@@ -370,126 +386,38 @@ def create_app(config, logger, database, item_cache, event_queue, request_counte
         'quest_change': 'QuestChangeNotification'
     }
 
-    # Helper function to process and store event
     def process_event(event_type, data):
         logger.info(f"Received {event_type} event")
-        timestamp_value = data.get('timestamp', None)
-        if timestamp_value is not None:
-            try:
-                if isinstance(timestamp_value, str):
-                    timestamp = datetime.datetime.fromisoformat(timestamp_value)
-                elif isinstance(timestamp_value, (int, float)):
-                    timestamp = datetime.datetime.fromtimestamp(timestamp_value, tz=datetime.timezone.utc)
-                else:
-                    logger.warning(f"Unknown timestamp type: {type(timestamp_value)}")
-                    timestamp = datetime.datetime.now(datetime.timezone.utc)
-            except Exception as e:
-                logger.error(f"Error parsing timestamp: {e}")
-                timestamp = datetime.datetime.now(datetime.timezone.utc)
-        else:
-            logger.warning("Timestamp is None; using current time")
-            timestamp = datetime.datetime.now(datetime.timezone.utc)
-        data['timestamp'] = timestamp.isoformat()
-        # Map IDs to names in data
-        data = map_ids_to_names(event_type, data)
-        # Save to database and get the event ID
-        event_id = database.add_event(event_type, data, timestamp.isoformat())
+        timestamp = data.get('timestamp', datetime.datetime.now().isoformat())
+        data['timestamp'] = timestamp
+        event_id = database.add_event(event_type, data, timestamp)
         if event_id:
-            # Enqueue the event data for the main app to process
-            event_queue.put({
-                'event_type': event_type,
-                'data': data,
-                'timestamp': timestamp.isoformat(),
-                'id': event_id
-            })
+            event_queue.put({'event_type': event_type, 'data': data, 'timestamp': timestamp, 'id': event_id})
 
-    def map_ids_to_names(event_type, data):
-        try:
-            if event_type == 'NpcKillNotification':
-                # Map npcId
-                npc_id = data['data'].get('npcId', None)
-                if npc_id:
-                    npc_id = int(npc_id)
-                    npc_name = item_cache.get_npc_name(npc_id)
-                    data['data']['npcName'] = npc_name if npc_name else f"NPC {npc_id}"
-                # Map items
-                items = data['data'].get('items', [])
-                for item in items:
-                    item_id = item.get('itemId', None)
-                    if item_id:
-                        item_info = item_cache.get_item_info(item_id)
-                        item['itemName'] = item_info.get('itemName')
-                        item['itemPrice'] = item_info.get('itemPrice')
-                        item['itemPriceFormatted'] = item_info.get('itemPriceFormatted')
-            elif event_type == 'InventorySlotsNotification':
-                # Map inventory items
-                inventory = data['data'].get('inventory', [])
-                for item in inventory:
-                    item_id = item.get('id', None)
-                    if item_id:
-                        item_info = item_cache.get_item_info(item_id)
-                        item['itemName'] = item_info.get('itemName')
-                        item['itemPrice'] = item_info.get('itemPrice')
-                        item['itemPriceFormatted'] = item_info.get('itemPriceFormatted')
-            elif event_type == 'EquipSlotsNotification':
-                # Map equipped items
-                equipped_items = data['data'].get('equippedItems', {})
-                for slot, item in equipped_items.items():
-                    item_id = item.get('id', None)
-                    if item_id:
-                        item_info = item_cache.get_item_info(item_id)
-                        item['itemName'] = item_info.get('itemName')
-                        item['itemPrice'] = item_info.get('itemPrice')
-                        item['itemPriceFormatted'] = item_info.get('itemPriceFormatted')
-            elif event_type == 'BankNotification':
-                # Map bank items
-                items = data['data'].get('items', [])
-                for item in items:
-                    item_id = item.get('id', None)
-                    if item_id:
-                        item_info = item_cache.get_item_info(item_id)
-                        item['itemName'] = item_info.get('itemName')
-                        item['itemPrice'] = item_info.get('itemPrice')
-                        item['itemPriceFormatted'] = item_info.get('itemPriceFormatted')
-            elif event_type == 'QuestChangeNotification':
-                # Map quest IDs to names if necessary
-                quests = data['data'].get('quests', [])
-                for quest in quests:
-                    # Assuming quest 'name' is already provided
-                    pass
-            # Add more event types as needed
-        except Exception as e:
-            logger.error(f"Error mapping IDs to names for event {event_type}: {e}")
-        return data
+    def create_handler(event_type_inner, full_endpoint_inner):
+        @app.route(full_endpoint_inner, methods=['POST'], endpoint=f"handler_{event_type_inner}")
+        @require_bearer_token
+        @validate_json(['data', 'timestamp'])
+        def handler(data, event_type_inner=event_type_inner):
+            request_counter.increment()
+            try:
+                process_event(event_type_inner, data)
+                response = jsonify({'status': 'success'}), 200
+            except Exception as e:
+                logger.error(f"Error processing event {event_type_inner}: {e}")
+                response = jsonify({'status': 'error', 'message': str(e)}), 500
+            finally:
+                request_counter.decrement()
+            return response
 
-    # Dynamically create route handlers
     for event_type_key, endpoint in supported_endpoints.items():
-        full_endpoint = f"{api_prefix}{endpoint}"
         event_type = event_type_mapping.get(event_type_key)
         if not event_type:
-            continue  # Skip if no event type mapping
-
-        def create_handler(event_type_inner, full_endpoint_inner):
-            endpoint_name = f"{event_type_inner}_handler_{full_endpoint_inner.strip('/').replace('/', '_')}"
-
-            @app.route(full_endpoint_inner, methods=['POST'], endpoint=endpoint_name)
-            @require_bearer_token
-            @validate_json(['data', 'timestamp'])
-            def handler(data):
-                request_counter.increment()
-                try:
-                    process_event(event_type_inner, data)
-                    response = jsonify({'status': 'success'}), 200
-                except Exception as e:
-                    logger.error(f"Error processing event {event_type_inner}: {e}")
-                    response = jsonify({'status': 'error', 'message': str(e)}), 500
-                finally:
-                    request_counter.decrement()
-                return response
-
-            return handler
-
+            logger.warning(f"No event type mapping found for key '{event_type_key}'. Skipping endpoint '{endpoint}'.")
+            continue
+        full_endpoint = f"{api_prefix}{endpoint}"
         create_handler(event_type, full_endpoint)
+        logger.debug(f"Created handler for event type '{event_type}' at endpoint '{full_endpoint}'")
 
     return app
 
@@ -497,18 +425,20 @@ def run_server(app, host, port):
     app.run(host=host, port=port, use_reloader=False, threaded=True)
 
 class ServerThread(threading.Thread):
-    def __init__(self, app, host, port):
+    def __init__(self, app, host, port, logger):
         threading.Thread.__init__(self)
         self.app = app
         self.host = host
         self.port = port
+        self.logger = logger
         self.daemon = True  # Allow thread to be killed when main thread exits
 
     def run(self):
         try:
+            self.logger.info(f"Starting Flask server on {self.host}:{self.port}")
             run_server(self.app, self.host, self.port)
         except Exception as e:
-            print(f"Server error: {e}")
+            self.logger.error(f"Server error: {e}")
 
 # -------------------- Main Application -------------------- #
 
@@ -563,7 +493,7 @@ class App:
     def setup_config_tab(self):
         # Display config options
         self.config_text = scrolledtext.ScrolledText(self.config_frame, wrap='word')
-        self.config_text.pack(fill='both', expand=True)
+        self.config_text.pack(fill='both', expand=True, padx=10, pady=10)
         self.load_config()
 
         # Save button
@@ -579,11 +509,13 @@ class App:
         config_str = self.config_text.get('1.0', tk.END)
         try:
             config = yaml.safe_load(config_str)
+            if not isinstance(config, dict):
+                raise ValueError("Configuration must be a valid YAML dictionary.")
             self.config.config = config
             self.config.save_config()
-            self.logger.info("Config saved.")
+            self.logger.info("Configuration saved.")
             messagebox.showinfo("Config", "Configuration saved successfully.")
-            # Optionally, restart the server or other components if needed
+            # Optionally, you can implement restarting the server or other components if needed
         except Exception as e:
             self.logger.error(f"Error saving config: {e}")
             messagebox.showerror("Error", f"Error saving config: {e}")
@@ -591,7 +523,7 @@ class App:
     def setup_events_tab(self):
         # Create a PanedWindow for resizable panes
         self.paned_window = ttk.PanedWindow(self.events_frame, orient=tk.VERTICAL)
-        self.paned_window.pack(fill='both', expand=True)
+        self.paned_window.pack(fill='both', expand=True, padx=5, pady=5)
 
         # Treeview to display events
         self.events_tree = ttk.Treeview(self.paned_window, columns=('Event Type', 'Timestamp', 'Received At'), show='headings')
@@ -609,7 +541,7 @@ class App:
 
         # Left frame for tree view
         self.tree_frame = ttk.Frame(self.lower_pane)
-        self.lower_pane.add(self.tree_frame)
+        self.lower_pane.add(self.tree_frame, weight=1)
 
         # Buttons for expand/collapse
         self.button_frame = ttk.Frame(self.tree_frame)
@@ -623,18 +555,18 @@ class App:
 
         # event_data_tree
         self.event_data_tree = ttk.Treeview(self.tree_frame)
-        self.event_data_tree.pack(fill='both', expand=True)
+        self.event_data_tree.pack(fill='both', expand=True, padx=5, pady=5)
 
         # Right frame for text view
         self.text_frame = ttk.Frame(self.lower_pane)
-        self.lower_pane.add(self.text_frame)
+        self.lower_pane.add(self.text_frame, weight=1)
 
         # Copy JSON button
         self.copy_button = ttk.Button(self.text_frame, text='Copy JSON', command=self.copy_json)
         self.copy_button.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
 
         # event_data_text
-        self.event_data_text = scrolledtext.ScrolledText(self.text_frame, wrap='word')
+        self.event_data_text = scrolledtext.ScrolledText(self.text_frame, wrap='word', state='disabled')
         self.event_data_text.pack(fill='both', expand=True, padx=5, pady=5)
 
         # Bind selection event
@@ -683,9 +615,7 @@ class App:
         selected_item = self.events_tree.selection()
         if selected_item:
             event_id = int(selected_item[0])
-            session = self.database.Session()
-            event_record = session.query(Event).get(event_id)
-            session.close()
+            event_record = self.database.get_event_by_id(event_id)
             if event_record:
                 # Clear the tree
                 self.clear_tree(self.event_data_tree)
@@ -694,8 +624,10 @@ class App:
                 self.display_json_in_tree(self.event_data_tree, '', data)
                 # Display the JSON data in the text widget
                 data_str = json.dumps(data, indent=2)
+                self.event_data_text.configure(state='normal')
                 self.event_data_text.delete('1.0', tk.END)
                 self.event_data_text.insert(tk.END, data_str)
+                self.event_data_text.configure(state='disabled')
 
     def clear_tree(self, tree):
         tree.delete(*tree.get_children())
@@ -722,7 +654,7 @@ class App:
 
     def setup_logs_tab(self):
         self.log_text = scrolledtext.ScrolledText(self.logs_frame, wrap='word', state='disabled')
-        self.log_text.pack(fill='both', expand=True)
+        self.log_text.pack(fill='both', expand=True, padx=10, pady=10)
         self.log_queue = queue.Queue()
         self.setup_logger()
 
@@ -751,15 +683,29 @@ class App:
                 timestamp = event_data.get('timestamp')
                 received_at = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
                 event_id = event_data.get('id')
+
+                # Ensure timestamp is a string
+                if not isinstance(timestamp, str):
+                    if timestamp is None:
+                        self.logger.warning(f"Event ID {event_id} has no timestamp. Using current time.")
+                        timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    else:
+                        self.logger.warning(
+                            f"Timestamp for Event ID {event_id} is not a string: {timestamp} (type: {type(timestamp)}). Converting to string.")
+                        timestamp = str(timestamp)
+
                 # Format timestamp
                 try:
                     timestamp_dt = datetime.datetime.fromisoformat(timestamp)
                     timestamp_str = timestamp_dt.strftime('%Y-%m-%d %H:%M:%S')
                 except ValueError:
+                    self.logger.error(
+                        f"Invalid timestamp format for Event ID {event_id}: {timestamp}. Using original value.")
                     timestamp_str = timestamp
+
                 # Insert the event into the Treeview if not already present
                 if not self.events_tree.exists(event_id):
-                    self.events_tree.insert('', 0, iid=event_id, values=(event_type, timestamp_str, received_at))
+                    self.events_tree.insert('', 'end', iid=event_id, values=(event_type, timestamp_str, received_at))
         except queue.Empty:
             pass
 
@@ -787,7 +733,7 @@ class App:
         # Start the server in a separate thread
         host = self.config.config['server']['host']
         port = self.config.config['server']['port']
-        self.server_thread = ServerThread(app, host, port)
+        self.server_thread = ServerThread(app, host, port, self.logger)
         self.server_thread.start()
         self.logger.info(f"Server started on {host}:{port}")
 

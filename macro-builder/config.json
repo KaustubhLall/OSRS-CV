@@ -272,7 +272,7 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1,
-            "disabled": true,
+            "disabled": false,
             "schedule": null,
             "repeat_interval": null
         },
@@ -382,7 +382,7 @@
             "is_loop_macro": false,
             "schedule": null,
             "repeat_interval": null,
-            "disabled": false,
+            "disabled": true,
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1
@@ -439,7 +439,7 @@
             "is_loop_macro": false,
             "schedule": null,
             "repeat_interval": null,
-            "disabled": false,
+            "disabled": true,
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1
@@ -1725,7 +1725,7 @@
             "is_loop_macro": false,
             "schedule": null,
             "repeat_interval": null,
-            "disabled": true,
+            "disabled": false,
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1

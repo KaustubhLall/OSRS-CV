@@ -11,7 +11,7 @@
     "macros": [
         {
             "name": "prayer - wilderness flick",
-            "hotkey": "ctrl+1",
+            "hotkey": "ctrl +1",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
@@ -272,7 +272,7 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1,
-            "disabled": true,
+            "disabled": false,
             "schedule": null,
             "repeat_interval": null
         },
@@ -285,28 +285,16 @@
                     "use_saved_target": false,
                     "positions": [
                         [
-                            1965,
-                            1122
+                            1949,
+                            1194
                         ],
                         [
-                            1965,
-                            1186
-                        ],
-                        [
-                            2038,
-                            1126
-                        ],
-                        [
-                            2036,
-                            1206
+                            2042,
+                            1189
                         ],
                         [
                             2123,
-                            1123
-                        ],
-                        [
-                            2123,
-                            1196
+                            1187
                         ]
                     ],
                     "modifiers": []
@@ -327,7 +315,7 @@
             "loop_count": 1
         },
         {
-            "name": "swap1",
+            "name": "swap 7 way - 1",
             "hotkey": "d",
             "actions": [
                 {
@@ -370,6 +358,17 @@
                     "modifiers": []
                 },
                 {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1969,
+                            1044
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
                     "type": "wait",
                     "duration": 0.01
                 },
@@ -382,13 +381,13 @@
             "is_loop_macro": false,
             "schedule": null,
             "repeat_interval": null,
-            "disabled": false,
+            "disabled": true,
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1
         },
         {
-            "name": "swap2",
+            "name": "swap 7 way - 2",
             "hotkey": "f",
             "actions": [
                 {
@@ -431,6 +430,17 @@
                     "modifiers": []
                 },
                 {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2132,
+                            1054
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
                     "type": "return_mouse",
                     "click_after_return": false
                 }
@@ -439,7 +449,7 @@
             "is_loop_macro": false,
             "schedule": null,
             "repeat_interval": null,
-            "disabled": false,
+            "disabled": true,
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1
@@ -616,7 +626,7 @@
             "is_loop_macro": false,
             "schedule": null,
             "repeat_interval": null,
-            "disabled": true,
+            "disabled": false,
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1
@@ -1207,7 +1217,7 @@
         },
         {
             "name": "test",
-            "hotkey": "a",
+            "hotkey": "alt  + 1",
             "actions": [
                 {
                     "type": "press_specific_panel_key",
@@ -1766,6 +1776,339 @@
             "call_count": 0,
             "current_position_index": 0,
             "loop_count": 1
+        },
+        {
+            "name": "fortis - swap",
+            "hotkey": "--",
+            "actions": [],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": false,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
+        },
+        {
+            "name": "fortis - swap Copy",
+            "hotkey": "--",
+            "actions": [],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": false,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
+        },
+        {
+            "name": "swap 6 way - 1",
+            "hotkey": "d",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1953,
+                            840
+                        ],
+                        [
+                            1955,
+                            907
+                        ],
+                        [
+                            2044,
+                            829
+                        ],
+                        [
+                            2038,
+                            907
+                        ],
+                        [
+                            1956,
+                            972
+                        ],
+                        [
+                            2035,
+                            981
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "wait",
+                    "duration": 0.01
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": false,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
+        },
+        {
+            "name": "swap 6 way 2",
+            "hotkey": "f",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2123,
+                            829
+                        ],
+                        [
+                            2207,
+                            826
+                        ],
+                        [
+                            2126,
+                            899
+                        ],
+                        [
+                            2208,
+                            902
+                        ],
+                        [
+                            2125,
+                            985
+                        ],
+                        [
+                            2212,
+                            980
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [],
+                    "modifiers": []
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": false,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
+        },
+        {
+            "name": "clean herb Copy",
+            "hotkey": "alt  + ,",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            1958,
+                            910
+                        ],
+                        [
+                            2036,
+                            897
+                        ],
+                        [
+                            2110,
+                            894
+                        ],
+                        [
+                            2212,
+                            905
+                        ],
+                        [
+                            1955,
+                            979
+                        ],
+                        [
+                            2034,
+                            982
+                        ],
+                        [
+                            2116,
+                            977
+                        ],
+                        [
+                            2197,
+                            980
+                        ],
+                        [
+                            1958,
+                            1047
+                        ],
+                        [
+                            2039,
+                            1049
+                        ],
+                        [
+                            2125,
+                            1045
+                        ],
+                        [
+                            2202,
+                            1053
+                        ],
+                        [
+                            1953,
+                            1127
+                        ],
+                        [
+                            2047,
+                            1117
+                        ],
+                        [
+                            2132,
+                            1120
+                        ],
+                        [
+                            2209,
+                            1124
+                        ],
+                        [
+                            1956,
+                            1189
+                        ],
+                        [
+                            2034,
+                            1187
+                        ],
+                        [
+                            2136,
+                            1199
+                        ],
+                        [
+                            2205,
+                            1196
+                        ],
+                        [
+                            1947,
+                            1251
+                        ],
+                        [
+                            2029,
+                            1255
+                        ],
+                        [
+                            2132,
+                            1267
+                        ],
+                        [
+                            2195,
+                            1250
+                        ]
+                    ],
+                    "modifiers": [
+                        "Shift"
+                    ]
+                },
+                {
+                    "type": "return_mouse",
+                    "click_after_return": false
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "schedule": null,
+            "repeat_interval": null,
+            "disabled": false,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
+        },
+        {
+            "name": "test Copy",
+            "hotkey": "shift  + 1",
+            "actions": [
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Prayer"
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2009,
+                            838
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "wait",
+                    "duration": 0.15
+                },
+                {
+                    "type": "click",
+                    "use_saved_target": false,
+                    "positions": [
+                        [
+                            2014,
+                            827
+                        ]
+                    ],
+                    "modifiers": []
+                },
+                {
+                    "type": "press_specific_panel_key",
+                    "panel": "Inventory"
+                }
+            ],
+            "is_dose_macro": false,
+            "is_loop_macro": false,
+            "schedule": "0",
+            "repeat_interval": "2",
+            "disabled": false,
+            "call_count": 0,
+            "current_position_index": 0,
+            "loop_count": 1
         }
     ],
     "mouse_move_duration": 0.01,
@@ -1774,5 +2117,9 @@
         "4-tick": 2.4,
         "3-tick": 0.0
     },
-    "task_execution_delay": 0.0
+    "task_execution_delay": 0.0,
+    "macro_sorting": {
+        "column": "Name",
+        "reverse": false
+    }
 }

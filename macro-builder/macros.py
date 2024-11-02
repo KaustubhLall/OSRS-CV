@@ -11,9 +11,7 @@ from tkinter import ttk
 
 import pyautogui
 from pynput import keyboard
-
-
-from pynput import keyboard
+import win32gui
 
 
 class HotkeyManager:
@@ -48,18 +46,6 @@ class HotkeyManager:
         )
         self.listener.start()
 
-    def normalize_key_name(self, key_name):
-        key_name = key_name.lower()
-        # Normalize modifier keys and other key names
-        if key_name in ("ctrl", "ctrl_l", "ctrl_r", "control"):
-            return "ctrl"
-        elif key_name in ("shift", "shift_l", "shift_r"):
-            return "shift"
-        elif key_name in ("alt", "alt_l", "alt_r", "alt_gr"):
-            return "alt"
-        else:
-            return self.key_aliases.get(key_name, key_name)
-
     def register_hotkeys(self, macros):
         # Clear existing hotkeys
         self.builtin_hotkeys.clear()
@@ -84,55 +70,120 @@ class HotkeyManager:
         if self.app.is_recording_hotkeys:
             return
 
+        # Check if macros should be enabled in the current active window
+        if self.app.allowed_windows_list:
+            try:
+                window = win32gui.GetForegroundWindow()
+                window_title = win32gui.GetWindowText(window)
+                if not any(
+                    allowed_window.lower() in window_title.lower()
+                    for allowed_window in self.app.allowed_windows_list
+                ):
+                    return  # Do not process the hotkey
+            except Exception as e:
+                print(f"Error in HotkeyManager on_press: {e}")
+                return  # Do not process the hotkey
+
         try:
             key_name = None
-            if isinstance(key, keyboard.KeyCode):
+            if hasattr(key, "char") and key.char is not None:
                 key_name = key.char
-            elif isinstance(key, keyboard.Key):
+            else:
                 key_name = key.name
-            if key_name:
-                key_name = self.normalize_key_name(key_name)
-                self.current_keys.add(key_name)
+
+            key_name = self.normalize_key_name(key_name)
+
+            self.current_keys.add(key_name)
+            # Uncomment below lines for debugging
+            # print(f"Pressed key: {key_name}")
+            # print(f"Current keys: {self.current_keys}")
+
+            # Check for built-in hotkeys
+            for hotkey_keys in self.builtin_hotkeys:
+                if (
+                    hotkey_keys.issubset(self.current_keys)
+                    and hotkey_keys not in self.pressed_hotkeys
+                ):
+                    self.pressed_hotkeys.add(hotkey_keys)
+                    self.execute_action(self.builtin_hotkeys[hotkey_keys])
+
+            # Check for macro-specific hotkeys
+            if self.app.macros_enabled:
+                for hotkey_keys in self.macro_hotkeys:
+                    if (
+                        hotkey_keys.issubset(self.current_keys)
+                        and hotkey_keys not in self.pressed_hotkeys
+                    ):
+                        self.pressed_hotkeys.add(hotkey_keys)
+                        self.execute_action(self.macro_hotkeys[hotkey_keys])
+
         except AttributeError:
             pass
-
-        # First, check and handle built-in hotkeys
-        for hotkey_keys, action in self.builtin_hotkeys.items():
-            if hotkey_keys.issubset(self.current_keys):
-                if hotkey_keys not in self.pressed_hotkeys:
-                    self.pressed_hotkeys.add(hotkey_keys)
-                    if isinstance(action, Macro):
-                        self.app.task_queue.put(action)
-                    elif callable(action):
-                        self.app.task_queue.put(action)
-
-        # Then, handle macro-specific hotkeys only if macros are enabled
-        if self.app.macros_enabled:
-            for hotkey_keys, macro in self.macro_hotkeys.items():
-                if hotkey_keys.issubset(self.current_keys):
-                    if hotkey_keys not in self.pressed_hotkeys:
-                        self.pressed_hotkeys.add(hotkey_keys)
-                        self.app.task_queue.put(macro)
 
     def on_release(self, key):
         try:
             key_name = None
-            if isinstance(key, keyboard.KeyCode):
+            if hasattr(key, "char") and key.char is not None:
                 key_name = key.char
-            elif isinstance(key, keyboard.Key):
+            else:
                 key_name = key.name
-            if key_name:
-                key_name = self.normalize_key_name(key_name)
-                self.current_keys.discard(key_name)
+
+            key_name = self.normalize_key_name(key_name)
+
+            self.current_keys.discard(key_name)
+
+            # Remove hotkeys that are no longer active
+            to_remove = set()
+            for hotkey_keys in self.pressed_hotkeys:
+                if not hotkey_keys.issubset(self.current_keys):
+                    to_remove.add(hotkey_keys)
+            self.pressed_hotkeys -= to_remove
         except AttributeError:
             pass
 
-        # Remove hotkeys that are no longer active
-        to_remove = set()
-        for hotkey_keys in self.pressed_hotkeys:
-            if not hotkey_keys.issubset(self.current_keys):
-                to_remove.add(hotkey_keys)
-        self.pressed_hotkeys -= to_remove
+    def execute_action(self, action):
+        if isinstance(action, Macro):
+            self.app.task_queue.put(action)
+        elif callable(action):
+            self.app.task_queue.put(action)
+
+    def normalize_key_name(self, key_name):
+        key_name = key_name.lower()
+        # Normalize modifier keys and other key names
+        if key_name in ("ctrl", "ctrl_l", "ctrl_r", "control"):
+            return "ctrl"
+        elif key_name in ("shift", "shift_l", "shift_r"):
+            return "shift"
+        elif key_name in ("alt", "alt_l", "alt_r", "alt_gr"):
+            return "alt"
+        elif key_name == "space":
+            return "space"
+        elif len(key_name) == 1 and key_name.isprintable():
+            shifted_char_map = {
+                "!": "1",
+                "@": "2",
+                "#": "3",
+                "$": "4",
+                "%": "5",
+                "^": "6",
+                "&": "7",
+                "*": "8",
+                "(": "9",
+                ")": "0",
+                "_": "-",
+                "+": "=",
+                "{": "[",
+                "}": "]",
+                "|": "\\",
+                ":": ";",
+                '"': "'",
+                "<": ",",
+                ">": ".",
+                "?": "/",
+            }
+            return shifted_char_map.get(key_name, key_name)
+        else:
+            return self.key_aliases.get(key_name, key_name)
 
     def disable_hotkeys(self):
         if self.listener and self.listener.running:
@@ -489,7 +540,7 @@ def load_macros(app):
                 repeat_interval = (
                     parse_time(macro.repeat_interval) if macro.repeat_interval else None
                 )
-                # app.scheduler.schedule_macro(macro, delay, repeat_interval)  # commendted due to error -> broken
+                # app.scheduler.schedule_macro(macro, delay, repeat_interval)
             else:
                 app.log(f"Invalid schedule format for macro '{macro.name}'.")
 
@@ -687,6 +738,9 @@ class MacroApp(tk.Tk):
         # Recording hotkeys flag
         self.is_recording_hotkeys = False
 
+        # Initialize `allowed_windows_list` before calling `create_widgets`
+        self.allowed_windows_list = self.config.get("allowed_windows", [])
+
         # Initialize HotkeyManager
         self.hotkey_manager = HotkeyManager(self)
 
@@ -710,6 +764,7 @@ class MacroApp(tk.Tk):
         self.scheduler = Scheduler(self)
         self.scheduler.start()
 
+        # Now that all initializations are done, create widgets
         self.create_widgets()
         self.update_mouse_position()
         self.register_hotkeys()
@@ -873,6 +928,9 @@ class MacroApp(tk.Tk):
         self.mouse_pos_label = ttk.Label(toolbar_frame, text="Mouse Position: (0, 0)")
         self.mouse_pos_label.pack(side="right", padx=5, pady=5)
 
+        self.active_window_label = ttk.Label(toolbar_frame, text="Active Window: ")
+        self.active_window_label.pack(side="right", padx=5, pady=5)
+
         # Notebook for tabs
         self.notebook = ttk.Notebook(top_frame)
         self.notebook.pack(expand=True, fill="both")
@@ -897,6 +955,7 @@ class MacroApp(tk.Tk):
 
         self.log_frame = log_frame  # Make log_frame an attribute for reference
         self.create_log_display()
+        self.update_active_window()
 
         # Bind the close event
         self.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -1062,6 +1121,59 @@ class MacroApp(tk.Tk):
         self.action_time_max_entry.insert(0, str(self.action_registration_time_max))
         self.action_time_max_entry.grid(row=2, column=1, padx=5, pady=5, sticky="w")
 
+        # --- Active Window Display ---
+        active_window_frame = ttk.LabelFrame(
+            scrollable_frame, text="Active Window", padding=(10, 10)
+        )
+        active_window_frame.grid(
+            row=3, column=0, columnspan=3, padx=5, pady=5, sticky="ew"
+        )
+
+        self.active_window_label = ttk.Label(
+            active_window_frame, text="Active Window: "
+        )
+
+        # --- Allowed Windows ---
+        allowed_windows_frame = ttk.LabelFrame(
+            scrollable_frame, text="Allowed Windows", padding=(10, 10)
+        )
+        allowed_windows_frame.grid(
+            row=4, column=0, columnspan=3, padx=5, pady=5, sticky="nsew"
+        )
+
+        allowed_windows_frame.columnconfigure(0, weight=1)
+        allowed_windows_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(
+            allowed_windows_frame,
+            text="Enable macros only when the active window matches one of the specified window titles.",
+        ).grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky="w")
+
+        # Listbox to display allowed windows
+        self.allowed_windows_listbox = tk.Listbox(allowed_windows_frame, height=5)
+        self.allowed_windows_listbox.grid(
+            row=1, column=0, padx=5, pady=5, sticky="nsew"
+        )
+
+        # Populate allowed windows listbox
+        for window_title in self.allowed_windows_list:
+            self.allowed_windows_listbox.insert(tk.END, window_title)
+
+        # Buttons to add/remove allowed windows
+        btn_frame = ttk.Frame(allowed_windows_frame)
+        btn_frame.grid(row=1, column=1, padx=5, pady=5, sticky="n")
+
+        add_window_btn = ttk.Button(
+            btn_frame, text="Add Window", command=self.add_allowed_window
+        )
+        add_window_btn.pack(side="top", padx=5, pady=2)
+
+        remove_window_btn = ttk.Button(
+            btn_frame, text="Remove Window", command=self.remove_allowed_window
+        )
+        remove_window_btn.pack(side="top", padx=5, pady=2)
+
+        self.active_window_label.pack(side="left", padx=5, pady=5)
         # Mouse Move Duration
         ttk.Label(timing_frame, text="Mouse Move Duration (s):").grid(
             row=3, column=0, sticky="e", padx=5, pady=5
@@ -1197,6 +1309,21 @@ class MacroApp(tk.Tk):
 
         # Remove any residual padding that might cause grey areas
         self.settings_frame.configure(padding=0)
+
+    def add_allowed_window(self):
+        new_window_title = simpledialog.askstring(
+            "Add Allowed Window", "Enter the window title or a part of it:"
+        )
+        if new_window_title:
+            self.allowed_windows_list.append(new_window_title)
+            self.allowed_windows_listbox.insert(tk.END, new_window_title)
+
+    def remove_allowed_window(self):
+        selected_indices = self.allowed_windows_listbox.curselection()
+        if selected_indices:
+            index = selected_indices[0]
+            self.allowed_windows_listbox.delete(index)
+            del self.allowed_windows_list[index]
 
     def add_wait_time(self):
         """Adds a new wait time after prompting the user for a name."""
@@ -1351,6 +1478,9 @@ class MacroApp(tk.Tk):
             self.config["wait_times"] = self.wait_times
             self.config["task_execution_delay"] = self.task_execution_delay
 
+            # Save allowed windows
+            self.config["allowed_windows"] = self.allowed_windows_list
+
             # Save configuration to file
             self.save_config()
 
@@ -1376,9 +1506,13 @@ class MacroApp(tk.Tk):
 
     def log(self, message, tag=""):
         timestamp = time.strftime("%H:%M:%S")
+        index = self.log_index
+        self.log_index += 1
         # Add to summary log
         log_id = f"{timestamp}_{len(self.log_details)}"
-        self.summary_tree.insert("", "end", values=(timestamp, message, ""), iid=log_id)
+        self.summary_tree.insert(
+            "", "0", values=(index, timestamp, message, ""), iid=log_id
+        )
         self.log_details[log_id] = message
         # Automatically select the latest log
         self.summary_tree.selection_set(log_id)
@@ -1388,11 +1522,14 @@ class MacroApp(tk.Tk):
         timestamp = time.strftime("%H:%M:%S")
         log_id = f"{timestamp}_{macro_name}_{len(self.log_details)}"  # Unique ID
 
-        # Add to summary log
+        index = self.log_index
+        self.log_index += 1
+
+        # Add to summary log, insert at the beginning to reverse order
         self.summary_tree.insert(
             "",
-            "end",
-            values=(timestamp, macro_name, self.format_time(total_time)),
+            "0",
+            values=(index, timestamp, macro_name, self.format_time(total_time)),
             iid=log_id,
         )
 
@@ -1516,6 +1653,27 @@ class MacroApp(tk.Tk):
         time_str = f"{minutes}m {seconds}s remaining"
         self.eta_label.config(text=f"Estimated Time Remaining: {time_str}")
 
+    def update_scheduled_macros(self):
+        """Updates the display for scheduled macros in the UI."""
+        # Clear existing scheduled macro entries
+        for item in self.scheduled_macros_tree.get_children():
+            self.scheduled_macros_tree.delete(item)
+
+        # Iterate over the currently scheduled tasks
+        with self.scheduler.lock:  # Ensure thread-safe access to the scheduled tasks
+            for task in self.scheduler.scheduled_tasks:
+                macro_name = task["macro"].name
+                next_run_time = time.strftime(
+                    "%H:%M:%S", time.localtime(task["next_run"])
+                )
+                repeat_interval = (
+                    task["repeat_interval"] if task["repeat_interval"] else "One-time"
+                )
+                # Insert the scheduled macro details into the treeview
+                self.scheduled_macros_tree.insert(
+                    "", "end", values=(macro_name, next_run_time, repeat_interval)
+                )
+
     def toggle_scheduling(self):
         self.scheduler.enabled = not self.scheduler.enabled
         if self.scheduler.enabled:
@@ -1542,8 +1700,16 @@ class MacroApp(tk.Tk):
         # Define columns with 'Doses' as the rightmost column
         columns = ("Name", "Hotkey", "Enabled", "Call Count", "Reset", "Doses")
 
+        # Create a Frame to hold the Treeview and the buttons
+        macro_tab_frame = ttk.Frame(self.macro_frame)
+        macro_tab_frame.pack(fill="both", expand=True)
+
+        # Treeview Frame
+        treeview_frame = ttk.Frame(macro_tab_frame)
+        treeview_frame.pack(side="top", fill="both", expand=True)
+
         self.macro_list = ttk.Treeview(
-            self.macro_frame, columns=columns, show="headings", height=15
+            treeview_frame, columns=columns, show="headings", height=15
         )
         for col in columns:
             self.macro_list.heading(
@@ -1589,9 +1755,17 @@ class MacroApp(tk.Tk):
         # Bind double-click event
         self.macro_list.bind("<Double-1>", self.on_macro_double_click)
 
+        # Apply saved sorting state or default to sorting by 'Name'
+        macro_sorting = self.config.get(
+            "macro_sorting", {"column": "Name", "reverse": False}
+        )
+        self.sort_treeview(
+            self.macro_list, macro_sorting["column"], macro_sorting["reverse"]
+        )
+
         # Buttons
-        btn_frame = ttk.Frame(self.macro_frame)
-        btn_frame.pack(pady=10)
+        btn_frame = ttk.Frame(macro_tab_frame)
+        btn_frame.pack(side="bottom", pady=10)
 
         add_macro_btn = ttk.Button(btn_frame, text="Add Macro", command=self.add_macro)
         add_macro_btn.pack(side="left", padx=5)
@@ -1639,6 +1813,10 @@ class MacroApp(tk.Tk):
 
     def sort_treeview(self, tree, col, reverse):
         """Sorts the Treeview by the given column without duplicating items."""
+        # Save the sorting state to config
+        self.config["macro_sorting"] = {"column": col, "reverse": reverse}
+        self.config_save_required = True  # Flag to save the config periodically
+
         try:
             # Attempt to sort as float
             l = [(float(tree.set(k, col)), k) for k in tree.get_children("")]
@@ -1654,7 +1832,9 @@ class MacroApp(tk.Tk):
             tree.move(k, "", index)
 
         # Toggle the sort order for next click
-        tree.heading(col, command=lambda: self.sort_treeview(tree, col, not reverse))
+        tree.heading(
+            col, command=lambda _col=col: self.sort_treeview(tree, _col, not reverse)
+        )
 
     def format_time(self, seconds):
         milliseconds = int((seconds - int(seconds)) * 1000)
@@ -1695,7 +1875,7 @@ class MacroApp(tk.Tk):
         log_paned_window.add(self.details_log_frame, weight=1)
 
         # Treeview for Summary Log
-        columns = ("Timestamp", "Macro", "Total Time")
+        columns = ("Index", "Timestamp", "Macro", "Total Time")
         self.summary_tree = ttk.Treeview(
             self.summary_log_frame, columns=columns, show="headings", height=10
         )
@@ -1703,6 +1883,9 @@ class MacroApp(tk.Tk):
             self.summary_tree.heading(col, text=col)
             self.summary_tree.column(col, width=100, anchor="center")
         self.summary_tree.pack(expand=True, fill="both", padx=5, pady=5)
+
+        # Initialize log index
+        self.log_index = 1
 
         # Bind selection event
         self.summary_tree.bind("<<TreeviewSelect>>", self.on_summary_select)
@@ -1721,6 +1904,18 @@ class MacroApp(tk.Tk):
         self.details_text.tag_configure("success", foreground="green")
         self.details_text.tag_configure("timing", foreground="purple")
 
+    def update_active_window(self):
+        try:
+            import win32gui
+
+            window = win32gui.GetForegroundWindow()
+            window_title = win32gui.GetWindowText(window)
+            self.active_window_label.config(text=f"Active Window: {window_title}")
+        except Exception as e:
+            self.active_window_label.config(text="Active Window: N/A")
+            print(f"Error in update_active_window: {e}")
+        self.after(1000, self.update_active_window)
+
 
 class MacroEditor(tk.Toplevel):
     def __init__(self, parent, macro_config, is_copy=False):
@@ -1731,7 +1926,19 @@ class MacroEditor(tk.Toplevel):
         self.title("Macro Editor")
         self.geometry("1024x600")
         self.resizable(True, True)
+
+        # Disable hotkeys
+        self.parent.hotkey_manager.disable_hotkeys()
+
+        # Handle window close event
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
+
         self.create_widgets()
+
+    def on_close(self):
+        # Re-enable hotkeys
+        self.parent.hotkey_manager.enable_hotkeys()
+        self.destroy()
 
     def create_widgets(self):
         instruction_label = ttk.Label(
@@ -1754,6 +1961,15 @@ class MacroEditor(tk.Toplevel):
         self.hotkey_entry = ttk.Entry(self, width=30)
         self.hotkey_entry.grid(
             row=2, column=1, columnspan=2, padx=10, pady=5, sticky="w"
+        )
+
+        # Add tips label
+        hotkey_tips = (
+            "Tip: Use '+' to combine keys, e.g., 'ctrl+1', 'shift+alt+a'.\n"
+            "Available keys: letters (a-z), numbers (0-9), function keys (f1-f12), modifiers (ctrl, shift, alt)."
+        )
+        ttk.Label(self, text=hotkey_tips, foreground="blue").grid(
+            row=3, column=1, columnspan=2, padx=10, pady=5, sticky="w"
         )
 
         # Disabled Checkbox
@@ -2187,6 +2403,71 @@ class MacroEditor(tk.Toplevel):
             # Update existing macro in config
             index = self.parent.config["macros"].index(self.macro_config)
             self.parent.config["macros"][index] = new_macro
+
+            # Update the Macro instance in macro_list_data
+            macro_instance = next(
+                (
+                    m
+                    for m in self.parent.macro_list_data
+                    if m.name == self.macro_config["name"]
+                ),
+                None,
+            )
+            if macro_instance:
+                macro_instance.name = new_macro["name"]
+                macro_instance.hotkey = new_macro["hotkey"]
+                macro_instance.actions = new_macro["actions"]
+                macro_instance.is_dose_macro = new_macro.get("is_dose_macro", False)
+                macro_instance.dose_count = (
+                    new_macro.get("dose_count", 4)
+                    if macro_instance.is_dose_macro
+                    else None
+                )
+                macro_instance.is_loop_macro = new_macro.get("is_loop_macro", False)
+                macro_instance.loop_count = (
+                    new_macro.get("loop_count", 1)
+                    if macro_instance.is_loop_macro
+                    else 1
+                )
+                macro_instance.schedule = new_macro.get("schedule", None)
+                macro_instance.repeat_interval = new_macro.get("repeat_interval", None)
+                macro_instance.disabled = new_macro.get("disabled", False)
+                # Update other attributes as needed
+
+            # Update the macro_list Treeview
+            for item in self.parent.macro_list.get_children():
+                values = self.parent.macro_list.item(item, "values")
+                if values[0] == self.macro_config["name"]:
+                    enabled = "Enabled" if not new_macro["disabled"] else "Disabled"
+                    call_count = (
+                        new_macro["call_count"]
+                        if new_macro.get("is_dose_macro", False)
+                        else ""
+                    )
+                    reset_text = (
+                        "Reset" if new_macro.get("is_dose_macro", False) else ""
+                    )
+                    doses = (
+                        new_macro["dose_count"]
+                        if new_macro.get("is_dose_macro", False)
+                        else "N/A"
+                    )
+                    tag = "enabled" if not new_macro["disabled"] else "disabled"
+
+                    self.parent.macro_list.item(
+                        item,
+                        values=(
+                            new_macro["name"],
+                            new_macro["hotkey"],
+                            enabled,
+                            call_count,
+                            reset_text,
+                            doses,
+                        ),
+                        tags=(tag,),
+                    )
+                    break  # Found and updated the macro in the Treeview
+
         else:
             # Add new macro to config
             self.parent.config["macros"].append(new_macro)
@@ -2231,7 +2512,7 @@ class MacroEditor(tk.Toplevel):
         # Log the action
         self.parent.log(f"Macro '{name}' has been saved.", "success")
 
-        self.destroy()
+        self.on_close()
 
 
 # ActionEditor Class
@@ -2333,6 +2614,8 @@ class ActionEditor(tk.Toplevel):
             self.custom_panel_key_entry.grid(row=1, column=1, padx=5, pady=5)
             self.custom_panel_key_entry.grid_remove()
         elif action_type == "Click":
+            self.positions = []  # Initialize positions here
+
             self.use_saved_target_var = tk.BooleanVar()
             self.use_saved_target_check = ttk.Checkbutton(
                 self.params_frame,
@@ -2461,6 +2744,9 @@ class ActionEditor(tk.Toplevel):
 
     def load_action_data(self):
         action_type = self.action.get("type")
+        self.selected_action_type.set(action_type.replace("_", " ").title())
+        self.update_action_fields()
+
         if action_type == "press_panel_key":
             self.key_entry.insert(0, self.action.get("key", ""))
         elif action_type == "press_specific_panel_key":
@@ -2472,10 +2758,10 @@ class ActionEditor(tk.Toplevel):
             else:
                 self.custom_panel_key_entry.grid_remove()
         elif action_type == "click":
-            self.use_saved_target_var.set(self.action.get("use_saved_target", False))
-            positions = self.action.get("positions", [])
-            for pos in positions:
+            self.positions = self.action.get("positions", [])
+            for pos in self.positions:
                 self.positions_listbox.insert("end", str(pos))
+            self.use_saved_target_var.set(self.action.get("use_saved_target", False))
             modifiers = self.action.get("modifiers", [])
             self.shift_var.set("Shift" in modifiers)
             self.ctrl_var.set("Ctrl" in modifiers)

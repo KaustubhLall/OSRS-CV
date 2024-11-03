@@ -2121,5 +2121,8 @@
     "macro_sorting": {
         "column": "Name",
         "reverse": false
-    }
+    },
+    "allowed_windows": [
+        "RuneLite"
+    ]
 }
